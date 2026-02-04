@@ -1,0 +1,22 @@
+# 编译输出
+# bin/
+
+# 临时文件
+cmd/mp4label/web/
+
+# 配置文件
+config.json
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志文件
+*.log

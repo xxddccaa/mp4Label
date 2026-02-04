@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mp4Label - Video Annotation Tool</title>
+    <!-- Video.js CSS -->
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>mp4Label - Video Annotation Tool</h1>
+            <div class="config-panel">
+                <button id="configBtn" class="btn btn-secondary">Config</button>
+            </div>
+        </div>
+
+        <!-- Config Dialog -->
+        <div id="configModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Configuration</h2>
+                <div class="config-form">
+                    <div class="form-group">
+                        <label for="videoDir">Video Directory:</label>
+                        <input type="text" id="videoDir" placeholder="/path/to/videos">
+                    </div>
+                    <div class="form-group">
+                        <label for="preAnnotationDir">Pre-annotation Directory (optional):</label>
+                        <input type="text" id="preAnnotationDir" placeholder="/path/to/pre-annotations">
+                    </div>
+                    <div class="form-group">
+                        <label for="outputDir">Output Directory:</label>
+                        <input type="text" id="outputDir" placeholder="/path/to/output">
+                    </div>
+                    <div class="form-group">
+                        <label for="taskFile">Task File (optional):</label>
+                        <input type="text" id="taskFile" placeholder="/path/to/task.txt">
+                        <small style="color: #666; display: block; margin-top: 4px;">Only annotate videos listed in this file (one name per line, without .mp4 extension)</small>
+                    </div>
+                    <div class="form-actions">
+                        <button id="saveConfigBtn" class="btn btn-primary">Save</button>
+                        <button id="cancelConfigBtn" class="btn btn-secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Sidebar: Video List -->
+            <div class="sidebar">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search videos...">
+                </div>
+                <div class="stats-panel" id="statsPanel" style="display: none;">
+                    <div class="stats-item">
+                        <span class="stats-label">Total:</span>
+                        <span class="stats-value" id="statsTotal">0</span>
+                    </div>
+                    <div class="stats-item">
+                        <span class="stats-label">Annotated:</span>
+                        <span class="stats-value" id="statsAnnotated">0</span>
+                    </div>
+                    <div class="stats-item">
+                        <span class="stats-label">Pre-annotated:</span>
+                        <span class="stats-value" id="statsPreAnnotated">0</span>
+                    </div>
+                    <div class="stats-item">
+                        <span class="stats-label">Unannotated:</span>
+                        <span class="stats-value" id="statsUnannotated">0</span>
+                    </div>
+                </div>
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="none">None</button>
+                    <button class="filter-btn" data-filter="pre">Pre-annotated</button>
+                    <button class="filter-btn" data-filter="done">Annotated</button>
+                </div>
+                <div class="video-list" id="videoList">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Center: Video Player -->
+            <div class="video-panel">
+                <div id="videoContainer" class="video-container">
+                    <video id="videoPlayer" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto">
+                        Your browser does not support video playback.
+                    </video>
+                </div>
+                <div class="video-controls">
+                    <div class="video-name-display">
+                        <div id="currentVideoName" class="video-name">Select a video</div>
+                        <div id="currentTime" class="time-display" title="Click to copy">00:00.000</div>
+                    </div>
+                    <div class="video-actions">
+                        <button id="insertTimestampBtn" class="btn btn-accent" title="Insert current timestamp to new step">
+                            <span>⏱</span> Insert Timestamp
+                        </button>
+                        <select id="playbackRate" class="playback-rate">
+                            <option value="0.5">0.5x</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>1x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2x</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Annotation Editor -->
+            <div class="editor-panel">
+                <div class="editor-header">
+                    <h2>Annotation Editor</h2>
+                    <div class="editor-actions">
+                        <button id="deleteAnnotationBtn" class="btn btn-danger" title="Delete saved annotation, reload pre-annotation">Delete</button>
+                        <button id="saveBtn" class="btn btn-primary">Save</button>
+                    </div>
+                </div>
+                <div class="editor-content">
+                    <div class="form-group">
+                        <label for="tutorialTitle">Tutorial Title:</label>
+                        <input type="text" id="tutorialTitle" placeholder="Enter tutorial title...">
+                    </div>
+                    <div class="form-group">
+                        <label>Steps:</label>
+                        <div id="stepsContainer" class="steps-container">
+                            <!-- Steps will be dynamically generated -->
+                        </div>
+                        <button id="addStepBtn" class="btn btn-secondary">Add Step</button>
+                    </div>
+                    <div class="form-group" id="notTutorialGroup" style="display: none;">
+                        <input type="checkbox" id="notTutorialCheck">
+                        <label for="notTutorialCheck" style="display: inline; margin-left: 5px; cursor: default;">Non-tutorial video</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video.js JS -->
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
