@@ -28,28 +28,28 @@
                         <label for="videoDir">Video Directory:</label>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="text" id="videoDir" placeholder="/path/to/videos" style="flex: 1;">
-                            <button type="button" class="btn btn-secondary" onclick="selectDirectory('videoDir')" title="Select folder">📁</button>
+                            <button type="button" class="btn btn-secondary" onclick="openBrowser('videoDir', 'directory')" title="Browse folder">📁</button>
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="preAnnotationDir">Pre-annotation Directory (optional):</label>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="text" id="preAnnotationDir" placeholder="/path/to/pre-annotations" style="flex: 1;">
-                            <button type="button" class="btn btn-secondary" onclick="selectDirectory('preAnnotationDir')" title="Select folder">📁</button>
+                            <button type="button" class="btn btn-secondary" onclick="openBrowser('preAnnotationDir', 'directory')" title="Browse folder">📁</button>
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="outputDir">Output Directory:</label>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="text" id="outputDir" placeholder="/path/to/output" style="flex: 1;">
-                            <button type="button" class="btn btn-secondary" onclick="selectDirectory('outputDir')" title="Select folder">📁</button>
+                            <button type="button" class="btn btn-secondary" onclick="openBrowser('outputDir', 'directory')" title="Browse folder">📁</button>
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="taskFile">Task File (optional):</label>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="text" id="taskFile" placeholder="/path/to/task.txt" style="flex: 1;">
-                            <button type="button" class="btn btn-secondary" onclick="selectFile('taskFile')" title="Select file">📄</button>
+                            <button type="button" class="btn btn-secondary" onclick="openBrowser('taskFile', 'file')" title="Browse file">📄</button>
                         </div>
                         <small style="color: #666; display: block; margin-top: 4px;">Only annotate videos listed in this file (one name per line, without .mp4 extension)</small>
                     </div>
@@ -57,13 +57,10 @@
                         <label for="modelAnnotationDir">Model Annotation Directory (optional):</label>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="text" id="modelAnnotationDir" placeholder="/path/to/model-annotations" style="flex: 1;">
-                            <button type="button" class="btn btn-secondary" onclick="selectDirectory('modelAnnotationDir')" title="Select folder">📁</button>
+                            <button type="button" class="btn btn-secondary" onclick="openBrowser('modelAnnotationDir', 'directory')" title="Browse folder">📁</button>
                         </div>
                         <small style="color: #666; display: block; margin-top: 4px;">For algorithm engineers: compare model-generated annotations with human annotations</small>
                     </div>
-                    <!-- Hidden file inputs for directory/file selection -->
-                    <input type="file" id="dirPicker" webkitdirectory directory multiple style="display: none;">
-                    <input type="file" id="filePicker" style="display: none;">
                     <div class="form-actions">
                         <button id="saveConfigBtn" class="btn btn-primary">Save</button>
                         <button id="cancelConfigBtn" class="btn btn-secondary">Cancel</button>

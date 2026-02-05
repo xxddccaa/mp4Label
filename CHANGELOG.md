@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.2.6] - 2026-02-05
+
+### New Features
+
+#### 🗂️ Native OS File Dialog
+- Added native file/folder picker accessed via 📁📄 buttons
+- Backend launches OS dialogs and returns full absolute paths
+- Supports both directory selection (4 paths) and file selection (1 path)
+- One-click selection fills the input field immediately
+- Removes browser security limitations for path selection
+
+### Technical Changes
+
+#### Backend (Go)
+- Added `GET /api/dialog` endpoint in `server.go`
+- macOS: uses `osascript` native dialogs
+- Windows: uses PowerShell dialog APIs
+- Linux: uses `zenity` for file/folder selection
+
+#### Frontend
+- Reused existing 📁📄 buttons to trigger native dialogs
+- `openBrowser(inputId, mode)` calls backend dialog API and sets the input path
+- Removed custom browser modal UI
+
+### User Experience
+- Click 📁/📄 buttons to open native OS picker
+- Select folder/file and get full path automatically
+- Reduces configuration errors from manual path entry
+- Faster setup and clearer workflow
+
+---
+
 ## [v0.2.5] - 2026-02-05
 
 ### New Features

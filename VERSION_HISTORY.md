@@ -2,6 +2,50 @@
 
 Complete version history and release notes for mp4Label.
 
+## [v0.2.6] - 2026-02-05
+
+### Overview
+Version 0.2.6 adds native OS file/folder dialogs so users can pick paths directly.
+
+### New Features
+
+#### 🗂️ Native OS Dialogs
+- **Browse Button (📁📄)**: Click to open native system dialog
+- **No Browser Limitation**: Uses backend to launch OS dialogs, returns full absolute path
+- **Mode Aware**:
+  - 📁 for directories (Video, Pre-annotation, Output, Model directories)
+  - 📄 for files (Task file)
+- **One Click**: Pick a path and it is filled into the input field
+
+### Technical Implementation
+
+#### Backend (Go)
+- New API endpoint: `GET /api/dialog?mode=file|directory`
+- Launches native OS dialog and returns selected absolute path
+- macOS: `osascript` `choose folder` / `choose file`
+- Windows: PowerShell `FolderBrowserDialog` / `OpenFileDialog`
+- Linux: `zenity` with file/folder selection
+
+#### Frontend
+- Reused 📁📄 buttons in config dialog
+- `openBrowser(inputId, mode)` calls backend dialog API and fills input
+- Fallback alert if dialog cannot be opened
+
+### User Workflow
+1. Click Config button
+2. Click 📁 or 📄 button next to any path input
+3. Use native OS dialog to pick a folder or file
+4. Path automatically fills into input field
+
+### Benefits
+- **No Manual Typing**: Browse visually instead of typing paths
+- **Fewer Errors**: Select existing paths, avoiding typos
+- **Faster Setup**: Quick navigation through filesystem
+- **User Friendly**: No need to remember exact paths
+- **Cross-platform**: Works on macOS, Linux, Windows
+
+---
+
 ## [v0.2.5] - 2026-02-05
 
 ### Overview

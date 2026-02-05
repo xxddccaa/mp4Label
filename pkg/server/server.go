@@ -8,7 +8,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/xd/mp4label/pkg/annotation"
@@ -43,6 +45,7 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/api/model-annotation/", s.handleModelAnnotation)
 	http.HandleFunc("/api/video/", s.handleVideo)
 	http.HandleFunc("/api/config", s.handleConfig)
+	http.HandleFunc("/api/dialog", s.handleDialog)
 
 	// 静态文件服务 - 使用嵌入的文件系统
 	staticFS, err := fs.Sub(s.webFS, "web/static")
@@ -381,4 +384,99 @@ func (s *Server) saveConfig(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+// handleDialog opens a native file/folder picker dialog and returns the selected path.
+func (s *Server) handleDialog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	mode := r.URL.Query().Get("mode")
+	if mode != "file" && mode != "directory" {
+		http.Error(w, "Invalid mode, must be 'file' or 'directory'", http.StatusBadRequest)
+		return
+	}
+
+	path, err := openNativeDialog(mode)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to open dialog: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"path": path})
+}
+
+func openNativeDialog(mode string) (string, error) {
+	switch runtime.GOOS {
+	case "darwin":
+		return openDialogMac(mode)
+	case "windows":
+		return openDialogWindows(mode)
+	default:
+		return openDialogLinux(mode)
+	}
+}
+
+func openDialogMac(mode string) (string, error) {
+	var script string
+	if mode == "directory" {
+		script = `POSIX path of (choose folder)`
+	} else {
+		script = `POSIX path of (choose file)`
+	}
+	out, err := runDialogCommand("osascript", "-e", script)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func openDialogWindows(mode string) (string, error) {
+	var script string
+	if mode == "directory" {
+		script = `
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+if ($dialog.ShowDialog() -eq "OK") { $dialog.SelectedPath }
+`
+	} else {
+		script = `
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+if ($dialog.ShowDialog() -eq "OK") { $dialog.FileName }
+`
+	}
+	out, err := runDialogCommand("powershell", "-NoProfile", "-Command", script)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func openDialogLinux(mode string) (string, error) {
+	var args []string
+	if mode == "directory" {
+		args = []string{"--file-selection", "--directory"}
+	} else {
+		args = []string{"--file-selection"}
+	}
+	out, err := runDialogCommand("zenity", args...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func runDialogCommand(name string, args ...string) ([]byte, error) {
+	out, err := exec.Command(name, args...).Output()
+	if err != nil {
+		if _, ok := err.(*exec.ExitError); ok {
+			return []byte(""), nil
+		}
+		return nil, err
+	}
+	return out, nil
 }

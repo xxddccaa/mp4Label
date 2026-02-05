@@ -57,7 +57,7 @@ bin/mp4label.exe web
 
 1. Open browser: `http://localhost:8080`
 2. Click "Config" button
-3. Set paths:
+3. Set paths (type manually or click 📁📄 to open native dialog):
    - **Video Directory**: Folder with MP4 files (required)
    - **Pre-annotation Directory**: Folder with pre-annotations (optional)
    - **Output Directory**: Where to save annotations (required)
@@ -221,14 +221,14 @@ Contributions welcome! Please:
 
 ## 📌 Version
 
-Current version: **v0.2.5** (2026-02-05)
+Current version: **v0.2.6** (2026-02-05)
 
 Recent updates:
+- **v0.2.6** - Simplified configuration UI: removed misleading path selection buttons
 - **v0.2.5** - Model annotation comparison panel for algorithm engineers
 - **v0.2.4** - Task file support, statistics display
 - **v0.2.3** - Keyboard shortcuts (0.5s), click-to-copy timestamp, bug fixes, documentation consolidation
 - **v0.2.2** - Video numbering, status filtering, time display optimization
-- **v0.2.1** - Millisecond precision timestamps, drag-and-drop sorting
 
 See [VERSION_HISTORY.md](VERSION_HISTORY.md) for complete history.
 

@@ -30,6 +30,7 @@ const cancelConfigBtn = document.getElementById('cancelConfigBtn');
 const insertTimestampBtn = document.getElementById('insertTimestampBtn');
 const playbackRate = document.getElementById('playbackRate');
 
+
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     initVideoPlayer();
@@ -1171,56 +1172,25 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// 选择目录
-function selectDirectory(inputId) {
-    const dirPicker = document.getElementById('dirPicker');
-    const targetInput = document.getElementById(inputId);
-    
-    // 清除之前的事件监听器
-    const newDirPicker = dirPicker.cloneNode(true);
-    dirPicker.parentNode.replaceChild(newDirPicker, dirPicker);
-    
-    newDirPicker.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            // 获取第一个文件的路径，然后提取目录路径
-            const firstFile = e.target.files[0];
-            // webkitRelativePath 包含相对路径，我们需要提取目录部分
-            const fullPath = firstFile.webkitRelativePath || firstFile.name;
-            const dirName = fullPath.split('/')[0];
-            
-            // 由于浏览器安全限制，我们无法获取完整的绝对路径
-            // 显示提示信息让用户手动输入或粘贴路径
-            const message = `Browser security prevents automatic path detection.\n\nPlease manually paste the full directory path.\n\nSelected folder: ${dirName}`;
-            alert(message);
-            targetInput.focus();
-        }
-    });
-    
-    newDirPicker.click();
-}
 
-// 选择文件
-function selectFile(inputId) {
-    const filePicker = document.getElementById('filePicker');
-    const targetInput = document.getElementById(inputId);
-    
-    // 清除之前的事件监听器
-    const newFilePicker = filePicker.cloneNode(true);
-    filePicker.parentNode.replaceChild(newFilePicker, filePicker);
-    
-    newFilePicker.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            const file = e.target.files[0];
-            
-            // 由于浏览器安全限制，我们无法获取完整的绝对路径
-            // 显示提示信息让用户手动输入或粘贴路径
-            const message = `Browser security prevents automatic path detection.\n\nPlease manually paste the full file path.\n\nSelected file: ${file.name}`;
-            alert(message);
-            targetInput.focus();
+// Open native file/folder dialog and set the selected path.
+async function openBrowser(inputId, mode) {
+    try {
+        const response = await fetch(`/api/dialog?mode=${encodeURIComponent(mode)}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            alert(`Failed to open dialog: ${errorText}`);
+            return;
         }
-    });
-    
-    newFilePicker.click();
+
+        const data = await response.json();
+        if (data.path) {
+            document.getElementById(inputId).value = data.path;
+        }
+    } catch (error) {
+        console.error('Failed to open dialog:', error);
+        alert('Failed to open dialog. Please paste the path manually.');
+    }
 }
 
 // 设置面板可调整大小
