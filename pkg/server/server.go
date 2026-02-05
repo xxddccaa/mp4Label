@@ -40,6 +40,7 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/", s.handleIndex)
 	http.HandleFunc("/api/videos", s.handleVideos)
 	http.HandleFunc("/api/annotation/", s.handleAnnotation)
+	http.HandleFunc("/api/model-annotation/", s.handleModelAnnotation)
 	http.HandleFunc("/api/video/", s.handleVideo)
 	http.HandleFunc("/api/config", s.handleConfig)
 
@@ -271,6 +272,71 @@ func (s *Server) handleVideo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeFile(w, r, videoPath)
+}
+
+// handleModelAnnotation 处理模型标注请求（只读）
+func (s *Server) handleModelAnnotation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 提取文件名
+	filename := strings.TrimPrefix(r.URL.Path, "/api/model-annotation/")
+	if filename == "" {
+		http.Error(w, "Filename cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	stem := strings.TrimSuffix(filename, filepath.Ext(filename))
+	s.getModelAnnotation(w, r, stem)
+}
+
+// getModelAnnotation 获取模型标注
+func (s *Server) getModelAnnotation(w http.ResponseWriter, r *http.Request, stem string) {
+	// 如果没有配置模型标注目录，返回空结果
+	if s.config.ModelAnnotationDir == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"available": false,
+			"message":   "Model annotation directory not configured",
+		})
+		return
+	}
+
+	// 从模型标注目录读取
+	modelPath := video.GetAnnotationPath(stem, s.config.ModelAnnotationDir)
+	if modelPath == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"available": false,
+			"message":   "Model annotation not found",
+		})
+		return
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"available": false,
+			"message":   "Model annotation not found",
+		})
+		return
+	}
+
+	// 解析标注文件
+	ann, err := annotation.ParseFile(modelPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to parse model annotation: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"available": true,
+		"annotation": ann,
+	})
 }
 
 // handleConfig 处理配置请求

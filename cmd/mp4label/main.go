@@ -13,8 +13,8 @@ import (
 //go:embed web
 var webFS embed.FS
 
-// 版本信息（编译时注入，默认为 v0.1）
-var version = "v0.1"
+// 版本信息（编译时注入，默认为 v0.2.5）
+var version = "v0.2.5"
 
 func main() {
 	// 如果没有参数，显示使用说明

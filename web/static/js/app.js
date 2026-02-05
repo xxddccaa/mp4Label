@@ -1,6 +1,7 @@
 // 全局状态
 let currentVideo = null;
 let currentAnnotation = null;
+let currentModelAnnotation = null; // 模型标注数据
 let videos = [];
 let videoStats = null; // 视频统计信息
 let config = null;
@@ -35,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     loadVideos();
     setupEventListeners();
+    setupResizableHandles();
 });
 
 // 初始化 Video.js 播放器
@@ -231,8 +233,19 @@ async function loadConfig() {
     try {
         const response = await fetch('/api/config');
         config = await response.json();
+        updateModelPanelVisibility();
     } catch (error) {
         console.error('加载配置失败:', error);
+    }
+}
+
+// 更新模型面板的显示状态
+function updateModelPanelVisibility() {
+    const modelPanel = document.getElementById('modelPanel');
+    if (config && config.model_annotation_dir && config.model_annotation_dir !== '') {
+        modelPanel.classList.add('visible');
+    } else {
+        modelPanel.classList.remove('visible');
     }
 }
 
@@ -242,6 +255,7 @@ function loadConfigToForm() {
     document.getElementById('preAnnotationDir').value = config?.pre_annotation_dir || '';
     document.getElementById('outputDir').value = config?.output_dir || '';
     document.getElementById('taskFile').value = config?.task_file || '';
+    document.getElementById('modelAnnotationDir').value = config?.model_annotation_dir || '';
 }
 
 // 保存配置
@@ -250,6 +264,7 @@ async function saveConfig() {
     const preAnnotationDir = document.getElementById('preAnnotationDir').value.trim();
     const outputDir = document.getElementById('outputDir').value.trim();
     const taskFile = document.getElementById('taskFile').value.trim();
+    const modelAnnotationDir = document.getElementById('modelAnnotationDir').value.trim();
 
     if (!videoDir || !outputDir) {
         alert('Video directory and output directory cannot be empty');
@@ -266,13 +281,15 @@ async function saveConfig() {
                 video_dir: videoDir,
                 pre_annotation_dir: preAnnotationDir || '',
                 output_dir: outputDir,
-                task_file: taskFile || ''
+                task_file: taskFile || '',
+                model_annotation_dir: modelAnnotationDir || ''
             })
         });
 
         if (response.ok) {
             configModal.style.display = 'none';
-            loadConfig();
+            await loadConfig();
+            updateModelPanelVisibility();
             loadVideos();
             alert('Configuration saved successfully');
         } else {
@@ -433,6 +450,11 @@ async function selectVideo(filename) {
 
     // 加载标注
     await loadAnnotation(filename);
+    
+    // 加载模型标注（如果已配置）
+    if (config && config.model_annotation_dir && config.model_annotation_dir !== '') {
+        await loadModelAnnotation(filename);
+    }
 }
 
 // 加载标注
@@ -974,4 +996,286 @@ function showCopyFeedback() {
         document.body.removeChild(feedback);
         document.head.removeChild(style);
     }, 2000);
+}
+
+// 加载模型标注
+async function loadModelAnnotation(filename) {
+    try {
+        const stem = filename.replace(/\.mp4$/, '');
+        const response = await fetch(`/api/model-annotation/${stem}.txt`);
+        const data = await response.json();
+        
+        if (data.available) {
+            currentModelAnnotation = data.annotation;
+        } else {
+            currentModelAnnotation = null;
+        }
+        
+        renderModelPanel();
+    } catch (error) {
+        console.error('Failed to load model annotation:', error);
+        currentModelAnnotation = null;
+        renderModelPanel();
+    }
+}
+
+// 渲染模型标注面板
+function renderModelPanel() {
+    const modelContent = document.getElementById('modelContent');
+    
+    if (!currentModelAnnotation) {
+        modelContent.innerHTML = '<div class="model-unavailable">No model annotation available for this video</div>';
+        return;
+    }
+    
+    // 非教学视频
+    if (!currentModelAnnotation.is_tutorial) {
+        modelContent.innerHTML = '<div style="padding: 1rem;"><p style="color: #666;">Non-tutorial video</p></div>';
+        return;
+    }
+    
+    // 教学视频 - 显示标题和步骤
+    let html = '<div style="padding: 1rem;">';
+    
+    // 标题
+    html += '<div class="form-group">';
+    html += '<label>Tutorial Title:</label>';
+    html += `<input type="text" value="${escapeHtml(currentModelAnnotation.title || '')}" readonly style="background-color: #e9ecef;">`;
+    html += '</div>';
+    
+    // 步骤
+    if (currentModelAnnotation.steps && currentModelAnnotation.steps.length > 0) {
+        html += '<div class="form-group">';
+        html += '<label>Steps:</label>';
+        html += '<div class="steps-container">';
+        
+        currentModelAnnotation.steps.forEach((step, index) => {
+            html += '<div class="step-item" title="Click timestamp to seek video, click description to copy">';
+            html += '<div class="step-header">';
+            html += `<span class="step-number">Step ${step.number}</span>`;
+            html += `<input type="text" class="step-timestamp model-timestamp" value="${escapeHtml(step.timestamp)}" readonly style="background-color: #e9ecef;" data-timestamp="${escapeHtml(step.timestamp)}" title="Click to seek video">`;
+            html += '</div>';
+            html += `<textarea class="step-description model-description" readonly style="background-color: #e9ecef;" data-description="${escapeHtml(step.description || '')}" title="Click to copy description">${escapeHtml(step.description || '')}</textarea>`;
+            html += '</div>';
+        });
+        
+        html += '</div>';
+        html += '</div>';
+    } else {
+        html += '<p style="color: #666; padding: 1rem;">No steps found</p>';
+    }
+    
+    html += '</div>';
+    modelContent.innerHTML = html;
+    
+    // 添加事件监听器
+    setupModelPanelListeners();
+}
+
+// 设置模型面板的事件监听器
+function setupModelPanelListeners() {
+    // 时间戳点击跳转
+    document.querySelectorAll('.model-timestamp').forEach(timestampInput => {
+        timestampInput.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const timestamp = e.target.dataset.timestamp;
+            seekToTimestamp(timestamp);
+        });
+    });
+    
+    // 描述点击复制（只在没有选择文字时触发）
+    document.querySelectorAll('.model-description').forEach(descriptionArea => {
+        descriptionArea.addEventListener('click', (e) => {
+            // 检查是否有文字被选中
+            const selection = window.getSelection();
+            const selectedText = selection.toString();
+            
+            // 如果没有选中文字，则复制整个描述
+            if (!selectedText) {
+                const description = e.target.dataset.description;
+                copyToClipboard(description, 'Description copied!');
+            }
+        });
+        
+        // 允许双击选择文字
+        descriptionArea.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+        });
+    });
+}
+
+// 通用复制到剪贴板函数
+function copyToClipboard(text, message) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showCopyMessage(message);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            fallbackCopy(text, message);
+        });
+    } else {
+        fallbackCopy(text, message);
+    }
+}
+
+// 备用复制方法
+function fallbackCopy(text, message) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        showCopyMessage(message);
+    } catch (err) {
+        console.error('Fallback copy failed:', err);
+    }
+    document.body.removeChild(textarea);
+}
+
+// 显示复制消息
+function showCopyMessage(message) {
+    const feedback = document.createElement('div');
+    feedback.textContent = message;
+    feedback.style.cssText = `
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #4CAF50;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 10000;
+        animation: fadeInOut 2s ease-in-out;
+    `;
+    
+    document.body.appendChild(feedback);
+    
+    setTimeout(() => {
+        if (feedback.parentNode) {
+            document.body.removeChild(feedback);
+        }
+    }, 2000);
+}
+
+// HTML 转义函数
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 选择目录
+function selectDirectory(inputId) {
+    const dirPicker = document.getElementById('dirPicker');
+    const targetInput = document.getElementById(inputId);
+    
+    // 清除之前的事件监听器
+    const newDirPicker = dirPicker.cloneNode(true);
+    dirPicker.parentNode.replaceChild(newDirPicker, dirPicker);
+    
+    newDirPicker.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            // 获取第一个文件的路径，然后提取目录路径
+            const firstFile = e.target.files[0];
+            // webkitRelativePath 包含相对路径，我们需要提取目录部分
+            const fullPath = firstFile.webkitRelativePath || firstFile.name;
+            const dirName = fullPath.split('/')[0];
+            
+            // 由于浏览器安全限制，我们无法获取完整的绝对路径
+            // 显示提示信息让用户手动输入或粘贴路径
+            const message = `Browser security prevents automatic path detection.\n\nPlease manually paste the full directory path.\n\nSelected folder: ${dirName}`;
+            alert(message);
+            targetInput.focus();
+        }
+    });
+    
+    newDirPicker.click();
+}
+
+// 选择文件
+function selectFile(inputId) {
+    const filePicker = document.getElementById('filePicker');
+    const targetInput = document.getElementById(inputId);
+    
+    // 清除之前的事件监听器
+    const newFilePicker = filePicker.cloneNode(true);
+    filePicker.parentNode.replaceChild(newFilePicker, filePicker);
+    
+    newFilePicker.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            
+            // 由于浏览器安全限制，我们无法获取完整的绝对路径
+            // 显示提示信息让用户手动输入或粘贴路径
+            const message = `Browser security prevents automatic path detection.\n\nPlease manually paste the full file path.\n\nSelected file: ${file.name}`;
+            alert(message);
+            targetInput.focus();
+        }
+    });
+    
+    newFilePicker.click();
+}
+
+// 设置面板可调整大小
+function setupResizableHandles() {
+    const handles = document.querySelectorAll('.resize-handle');
+    
+    handles.forEach(handle => {
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+        let panel = null;
+        
+        handle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.clientX;
+            
+            const panelId = handle.dataset.panel;
+            panel = document.getElementById(panelId);
+            startWidth = panel.offsetWidth;
+            
+            // 如果是视频面板，需要移除 flex 样式，改为固定宽度
+            if (panelId === 'videoPanel') {
+                panel.style.flex = 'none';
+            }
+            
+            handle.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing || !panel) return;
+            
+            const deltaX = e.clientX - startX;
+            const newWidth = startWidth + deltaX;
+            
+            // 获取面板的最小和最大宽度
+            const minWidth = parseInt(getComputedStyle(panel).minWidth) || 200;
+            const maxWidth = parseInt(getComputedStyle(panel).maxWidth) || 2000;
+            
+            if (newWidth >= minWidth && newWidth <= maxWidth) {
+                panel.style.width = newWidth + 'px';
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                handle.classList.remove('resizing');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                panel = null;
+            }
+        });
+    });
 }

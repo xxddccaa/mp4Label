@@ -10,10 +10,11 @@ import (
 
 // Config 表示应用配置
 type Config struct {
-	VideoDir        string `json:"video_dir"`         // 视频目录
-	PreAnnotationDir string `json:"pre_annotation_dir"` // 预标注目录（可选）
-	OutputDir       string `json:"output_dir"`         // 输出目录
-	TaskFile        string `json:"task_file"`          // 子任务文件（可选），用于指定要标注的视频列表
+	VideoDir           string `json:"video_dir"`            // 视频目录
+	PreAnnotationDir   string `json:"pre_annotation_dir"`   // 预标注目录（可选）
+	OutputDir          string `json:"output_dir"`           // 输出目录
+	TaskFile           string `json:"task_file"`            // 子任务文件（可选），用于指定要标注的视频列表
+	ModelAnnotationDir string `json:"model_annotation_dir"` // 模型标注目录（可选），用于算法人员对比模型标注效果
 }
 
 var defaultConfig = Config{
@@ -105,6 +106,7 @@ func (c *Config) Normalize() {
 	c.PreAnnotationDir = CleanPath(c.PreAnnotationDir)
 	c.OutputDir = CleanPath(c.OutputDir)
 	c.TaskFile = CleanPath(c.TaskFile)
+	c.ModelAnnotationDir = CleanPath(c.ModelAnnotationDir)
 }
 
 // Validate 验证配置
@@ -136,6 +138,12 @@ func (c *Config) Validate() error {
 	if c.TaskFile != "" {
 		if _, err := os.Stat(c.TaskFile); os.IsNotExist(err) {
 			return fmt.Errorf("task file does not exist: %s", c.TaskFile)
+		}
+	}
+
+	if c.ModelAnnotationDir != "" {
+		if _, err := os.Stat(c.ModelAnnotationDir); os.IsNotExist(err) {
+			return fmt.Errorf("model annotation directory does not exist: %s", c.ModelAnnotationDir)
 		}
 	}
 

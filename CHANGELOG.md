@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.2.5] - 2026-02-05
+
+### New Features
+
+#### 🤖 Model Annotation Comparison Panel
+- Added optional "Model Annotation Directory" configuration for algorithm engineers
+- New 4th panel (right-most) displays model-generated annotations in read-only mode
+- Dynamic layout: panel only appears when model annotation directory is configured
+- Allows side-by-side comparison between human annotations and model predictions
+- Helps algorithm teams evaluate model performance and identify improvement areas
+
+### Technical Changes
+- Backend: Added `ModelAnnotationDir` field to `Config` struct
+- Backend: New API endpoint `GET /api/model-annotation/:filename` for fetching model annotations
+- Frontend: Added model panel with read-only display of model annotations
+- Frontend: Dynamic 4-panel layout that adapts based on configuration
+- Frontend: Visual distinction (gray background) indicates read-only model annotations
+
+### Configuration
+- New optional field: `model_annotation_dir` in config
+- Backward compatible: existing users see no changes unless they configure this field
+- Model annotation files use same format as human annotations (`.txt` files)
+
+### User Experience
+- Algorithm engineers can now compare model output with ground truth annotations
+- Annotators continue using 3-panel layout (unchanged experience)
+- Seamless switching between 3-panel and 4-panel modes based on config
+
+---
+
 ## [v0.2.4] - 2026-02-04
 
 ### New Features

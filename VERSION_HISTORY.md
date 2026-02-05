@@ -2,6 +2,75 @@
 
 Complete version history and release notes for mp4Label.
 
+## [v0.2.5] - 2026-02-05
+
+### Overview
+Version 0.2.5 adds model annotation comparison functionality specifically designed for algorithm engineers to evaluate model performance.
+
+### New Features
+
+#### Model Annotation Comparison Panel
+- **Purpose**: Allow algorithm engineers to compare model-generated annotations with human ground truth
+- **4th Panel**: New optional panel appears on the right-most side when configured
+- **Dynamic Layout**: Seamlessly switches between 3-panel (annotators) and 4-panel (algorithm engineers) modes
+- **Read-only Display**: Model annotations shown in read-only mode with visual distinction (gray background)
+- **Same Format**: Model annotations use identical `.txt` file format as human annotations
+
+### Configuration Changes
+- **New Field**: `model_annotation_dir` (optional)
+- **Location**: Configuration modal and `~/.mp4label/config.json`
+- **Validation**: Automatically validates directory existence if specified
+- **Backward Compatible**: Existing users experience no changes unless they configure this field
+
+### Technical Implementation
+- **Backend**: New API endpoint `/api/model-annotation/:filename`
+- **Backend**: Extended `Config` struct with `ModelAnnotationDir` field
+- **Frontend**: Dynamic panel visibility based on configuration
+- **Frontend**: Separate rendering logic for model annotations
+- **Frontend**: Visual styling to differentiate model annotations from editable annotations
+
+### User Workflows
+
+#### For Annotators (Unchanged)
+- Continue using 3-panel layout
+- No impact on existing annotation workflow
+- Model panel remains hidden
+
+#### For Algorithm Engineers (New)
+1. Configure model annotation directory in settings
+2. Select video to compare
+3. View human annotation in center-right panel (editable)
+4. View model annotation in right-most panel (read-only)
+5. Identify differences and areas for model improvement
+
+### Benefits
+- **Quality Evaluation**: Quickly assess model annotation quality
+- **Error Analysis**: Identify systematic errors in model predictions
+- **Iteration Speed**: Faster feedback loop for model development
+- **Side-by-Side**: Easy visual comparison of model vs human annotations
+
+---
+
+## [v0.2.4] - 2026-02-04
+
+### Overview
+Version 0.2.4 adds task file support and statistics display for better annotation management.
+
+### New Features
+
+#### 📊 Task File Support
+- Specify subset of videos to annotate via text file
+- Useful for collaborative annotation workflows
+- One video name per line (without .mp4 extension)
+- Automatically filters video list
+
+#### 📈 Statistics Display
+- Real-time statistics in left sidebar
+- Shows: Total, Annotated, Pre-annotated, Unannotated counts
+- Updates automatically when annotations saved/deleted
+
+---
+
 ## [v0.2.3] - 2026-02-04
 
 ### New Features

@@ -55,6 +55,8 @@ Visit: `http://localhost:8080`
    - **Video Directory**: Directory containing MP4 files (required)
    - **Pre-annotation Directory**: Directory with pre-annotation files (optional)
    - **Output Directory**: Where to save annotation files (required)
+   - **Task File**: Text file with video names to annotate (optional)
+   - **Model Annotation Directory**: Directory with model-generated annotations (optional, for algorithm engineers)
 3. Click "Save"
 
 Configuration is automatically saved to `~/.mp4label/config.json`
@@ -482,7 +484,8 @@ Format:
   "video_dir": "/path/to/videos",
   "pre_annotation_dir": "/path/to/pre-annotations",
   "output_dir": "/path/to/output",
-  "task_file": "/path/to/task.txt"
+  "task_file": "/path/to/task.txt",
+  "model_annotation_dir": "/path/to/model-annotations"
 }
 ```
 
@@ -492,6 +495,7 @@ Format:
 - **pre_annotation_dir**: Optional, will be ignored if not set
 - **output_dir**: Must exist and be writable
 - **task_file**: Optional, text file specifying which videos to annotate
+- **model_annotation_dir**: Optional, for algorithm engineers to compare model annotations
 
 ### Task File Feature (v0.2.4+)
 
@@ -531,6 +535,77 @@ beginner_guide_chapter2
 - Video names are matched exactly (case-sensitive)
 - The `.mp4` extension is automatically removed if present in the file
 - Videos not in the task file are completely hidden from the interface
+
+### Model Annotation Comparison (v0.2.5+)
+
+The model annotation feature is designed for **algorithm engineers** to compare model-generated annotations with human ground truth annotations.
+
+#### Purpose
+
+- **Quality Evaluation**: Assess model annotation quality against human annotations
+- **Error Analysis**: Identify systematic errors in model predictions
+- **Iteration Speed**: Faster feedback loop for model development
+- **Visual Comparison**: Side-by-side comparison of model vs human annotations
+
+#### Setup
+
+1. Train your model to output annotations in the same format as human annotations (`.txt` files)
+2. Generate model annotations for your video dataset
+3. Place model annotation files in a dedicated directory
+4. Configure the model annotation directory path in settings
+
+#### Configuration
+
+```json
+{
+  "video_dir": "/path/to/videos",
+  "pre_annotation_dir": "/path/to/pre-annotations",
+  "output_dir": "/path/to/output",
+  "task_file": "/path/to/task.txt",
+  "model_annotation_dir": "/path/to/model-annotations"
+}
+```
+
+#### How It Works
+
+1. **Without Model Directory**: 3-panel layout (video list, player, annotation editor) - standard annotator view
+2. **With Model Directory**: 4-panel layout - adds read-only model annotation panel on the right
+
+#### Model Annotation Format
+
+Model annotations must use the **same format** as human annotations:
+
+**Tutorial Video**:
+```
+Tutorial Title
+
+1) 00:11.230 Step description
+2) 00:25.560 Step description
+3) 00:42.890 Step description
+```
+
+**Non-Tutorial Video**:
+```
+[not tutorial]
+```
+
+#### Usage for Algorithm Engineers
+
+1. Configure model annotation directory in settings
+2. Select a video from the list
+3. Compare:
+   - **Center-right panel**: Human annotation (editable)
+   - **Right-most panel**: Model annotation (read-only, gray background)
+4. Identify differences and improvement areas
+5. Iterate on model training
+
+#### Notes
+
+- Model panel only appears when `model_annotation_dir` is configured
+- Model annotations are **read-only** - cannot be edited
+- If model annotation file doesn't exist for a video, panel shows "No model annotation available"
+- Annotators don't need to configure this - their workflow remains unchanged
+- Model annotations are never overwritten by the application
 
 ### Quote Handling
 

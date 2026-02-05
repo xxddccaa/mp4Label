@@ -47,11 +47,14 @@ body {
 /* 左侧视频列表 */
 .sidebar {
     width: 300px;
+    min-width: 200px;
+    max-width: 600px;
     background-color: white;
     border-right: 1px solid #e0e0e0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
 }
 
 .search-box {
@@ -345,11 +348,101 @@ body {
 /* 右侧标注编辑器 */
 .editor-panel {
     width: 550px;
+    min-width: 400px;
+    max-width: 800px;
     background-color: white;
     border-left: 1px solid #e0e0e0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
+}
+
+/* 模型标注面板（第4个面板，可选显示） */
+.model-panel {
+    width: 450px;
+    min-width: 350px;
+    max-width: 800px;
+    background-color: #f8f9fa;
+    border-left: 1px solid #e0e0e0;
+    display: none; /* 默认隐藏 */
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+.model-panel.visible {
+    display: flex;
+}
+
+.model-panel .editor-header {
+    background-color: #e9ecef;
+}
+
+.model-panel .editor-content {
+    background-color: #f8f9fa;
+}
+
+.model-panel .step-item {
+    background-color: #e9ecef;
+    cursor: default;
+    min-height: 140px; /* 确保与编辑面板的步骤块等高 */
+}
+
+.model-panel .step-item:hover {
+    background-color: #dee2e6;
+    border-color: #adb5bd;
+}
+
+.model-panel input[type="text"].step-timestamp {
+    pointer-events: auto;
+    opacity: 0.8;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.model-panel input[type="text"].step-timestamp:hover {
+    background-color: #d1ecf1 !important;
+    border-color: #0c5460;
+}
+
+.model-panel textarea {
+    pointer-events: auto;
+    opacity: 0.8;
+    cursor: pointer;
+    user-select: text;
+    transition: all 0.2s;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+}
+
+.model-panel textarea:hover {
+    background-color: #d1ecf1 !important;
+    border-color: #0c5460;
+}
+
+.model-panel textarea::selection {
+    background-color: #b3d4fc;
+    color: #000;
+}
+
+.model-panel input[readonly]:not(.step-timestamp),
+.model-panel button {
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+.model-panel .step-drag-handle,
+.model-panel .step-remove {
+    display: none;
+}
+
+.model-unavailable {
+    padding: 2rem;
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
 }
 
 .editor-header {
@@ -413,6 +506,8 @@ body {
     position: relative;
     cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
 }
 
 .step-item:hover {
@@ -486,6 +581,7 @@ body {
     font-size: 0.9rem;
     resize: vertical;
     min-height: 60px;
+    flex: 1;
 }
 
 .step-remove {
@@ -624,4 +720,40 @@ body {
 
 .shake {
     animation: shake 0.5s;
+}
+
+/* 淡入淡出动画 */
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+}
+
+/* 面板拖动调整大小的分隔条 */
+.resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5px;
+    height: 100%;
+    cursor: col-resize;
+    background-color: transparent;
+    z-index: 10;
+    transition: background-color 0.2s;
+}
+
+.resize-handle:hover {
+    background-color: #2196f3;
+}
+
+.resize-handle.resizing {
+    background-color: #1976d2;
+}
+
+/* 视频面板 */
+.video-panel {
+    position: relative;
+    min-width: 400px;
+    flex: 1; /* 占据剩余空间 */
 }

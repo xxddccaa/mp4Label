@@ -26,21 +26,44 @@
                 <div class="config-form">
                     <div class="form-group">
                         <label for="videoDir">Video Directory:</label>
-                        <input type="text" id="videoDir" placeholder="/path/to/videos">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="videoDir" placeholder="/path/to/videos" style="flex: 1;">
+                            <button type="button" class="btn btn-secondary" onclick="selectDirectory('videoDir')" title="Select folder">📁</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="preAnnotationDir">Pre-annotation Directory (optional):</label>
-                        <input type="text" id="preAnnotationDir" placeholder="/path/to/pre-annotations">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="preAnnotationDir" placeholder="/path/to/pre-annotations" style="flex: 1;">
+                            <button type="button" class="btn btn-secondary" onclick="selectDirectory('preAnnotationDir')" title="Select folder">📁</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="outputDir">Output Directory:</label>
-                        <input type="text" id="outputDir" placeholder="/path/to/output">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="outputDir" placeholder="/path/to/output" style="flex: 1;">
+                            <button type="button" class="btn btn-secondary" onclick="selectDirectory('outputDir')" title="Select folder">📁</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="taskFile">Task File (optional):</label>
-                        <input type="text" id="taskFile" placeholder="/path/to/task.txt">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="taskFile" placeholder="/path/to/task.txt" style="flex: 1;">
+                            <button type="button" class="btn btn-secondary" onclick="selectFile('taskFile')" title="Select file">📄</button>
+                        </div>
                         <small style="color: #666; display: block; margin-top: 4px;">Only annotate videos listed in this file (one name per line, without .mp4 extension)</small>
                     </div>
+                    <div class="form-group">
+                        <label for="modelAnnotationDir">Model Annotation Directory (optional):</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="modelAnnotationDir" placeholder="/path/to/model-annotations" style="flex: 1;">
+                            <button type="button" class="btn btn-secondary" onclick="selectDirectory('modelAnnotationDir')" title="Select folder">📁</button>
+                        </div>
+                        <small style="color: #666; display: block; margin-top: 4px;">For algorithm engineers: compare model-generated annotations with human annotations</small>
+                    </div>
+                    <!-- Hidden file inputs for directory/file selection -->
+                    <input type="file" id="dirPicker" webkitdirectory directory multiple style="display: none;">
+                    <input type="file" id="filePicker" style="display: none;">
                     <div class="form-actions">
                         <button id="saveConfigBtn" class="btn btn-primary">Save</button>
                         <button id="cancelConfigBtn" class="btn btn-secondary">Cancel</button>
@@ -52,7 +75,8 @@
         <!-- Main Content -->
         <div class="main-content">
             <!-- Left Sidebar: Video List -->
-            <div class="sidebar">
+            <div class="sidebar" id="sidebar">
+                <div class="resize-handle" data-panel="sidebar"></div>
                 <div class="search-box">
                     <input type="text" id="searchInput" placeholder="Search videos...">
                 </div>
@@ -86,7 +110,8 @@
             </div>
 
             <!-- Center: Video Player -->
-            <div class="video-panel">
+            <div class="video-panel" id="videoPanel">
+                <div class="resize-handle" data-panel="videoPanel"></div>
                 <div id="videoContainer" class="video-container">
                     <video id="videoPlayer" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto">
                         Your browser does not support video playback.
@@ -114,7 +139,8 @@
             </div>
 
             <!-- Right: Annotation Editor -->
-            <div class="editor-panel">
+            <div class="editor-panel" id="editorPanel">
+                <div class="resize-handle" data-panel="editorPanel"></div>
                 <div class="editor-header">
                     <h2>Annotation Editor</h2>
                     <div class="editor-actions">
@@ -137,6 +163,19 @@
                     <div class="form-group" id="notTutorialGroup" style="display: none;">
                         <input type="checkbox" id="notTutorialCheck">
                         <label for="notTutorialCheck" style="display: inline; margin-left: 5px; cursor: default;">Non-tutorial video</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Annotation Panel (4th panel, conditionally shown) -->
+            <div class="model-panel" id="modelPanel">
+                <div class="resize-handle" data-panel="modelPanel"></div>
+                <div class="editor-header">
+                    <h2>Model Annotation (Read-only)</h2>
+                </div>
+                <div class="editor-content">
+                    <div id="modelContent">
+                        <div class="model-unavailable">No model annotation configured</div>
                     </div>
                 </div>
             </div>
