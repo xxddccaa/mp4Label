@@ -1,5 +1,5 @@
 # 编译输出
-# bin/
+bin/
 
 # 临时文件
 cmd/mp4label/web/
@@ -20,3 +20,5 @@ Thumbs.db
 
 # 日志文件
 *.log
+
+mp4label*
