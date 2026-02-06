@@ -309,15 +309,18 @@ POST /api/config                 Save config
 - **v0.2.1** (2026-02-03): Millisecond precision, drag-and-drop
 - **v0.2.2** (2026-02-03): Video numbering, status filtering
 - **v0.2.3** (2026-02-04): Keyboard shortcuts (0.5s), copy timestamp, bug fixes, internationalization
+- **v0.2.4** (2026-02-04): Task file support, statistics display
+- **v0.2.5** (2026-02-05): Model annotation comparison panel
+- **v0.2.6** (2026-02-05): Native OS file/folder dialogs
+- **v0.2.7** (2026-02-06): Auto-save annotations, 1ms timestamp fix
 
-### Recent Changes (v0.2.3)
+### Recent Changes (v0.2.7)
 
-1. **Keyboard shortcuts:** Arrow keys now 0.5s instead of 5s
-2. **Copy timestamp:** Click timestamp display to copy
-3. **Bug fix:** Non-tutorial checkbox click area fixed
-4. **Documentation:** Consolidated from 20+ files to 5 files
-5. **Internationalization:** All UI and docs in English
-6. **Build system:** `make` now builds all platforms by default
+1. **Auto-save:** Annotations auto-saved 1.5s after any edit with debouncing
+2. **Status indicator:** Visual feedback (Unsaved/Saving/Saved/Error) in editor header
+3. **Flush on navigate:** Pending changes saved immediately when switching videos
+4. **Timestamp fix:** Fixed 1ms precision error caused by floating-point rounding
+5. **Change detection:** Skips redundant saves when data hasn't changed
 
 ## Important Notes for AI Assistants
 
@@ -409,5 +412,5 @@ For questions or issues:
 
 ---
 
-**Last Updated:** 2026-02-04 (v0.2.3)  
+**Last Updated:** 2026-02-06 (v0.2.7)  
 **Maintained for:** AI-assisted development with Claude and similar tools

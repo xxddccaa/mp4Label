@@ -8,6 +8,10 @@ let config = null;
 let player = null; // Video.js player 实例
 let selectedStepIndex = -1; // 当前选中的步骤索引，-1 表示没有选中
 let currentFilter = 'all'; // 当前筛选状态
+let autoSaveTimer = null; // 自动保存定时器
+let lastSavedAnnotationJSON = null; // 上次保存的标注JSON，用于检测变化
+
+const AUTO_SAVE_DELAY = 1500; // 自动保存延迟（毫秒）
 
 // DOM 元素
 const videoList = document.getElementById('videoList');
@@ -111,6 +115,11 @@ function setupEventListeners() {
     // 保存标注
     saveBtn.addEventListener('click', saveAnnotation);
 
+    // 标题输入触发自动保存
+    tutorialTitle.addEventListener('input', () => {
+        scheduleAutoSave();
+    });
+
     // 删除标注
     deleteAnnotationBtn.addEventListener('click', deleteAnnotation);
 
@@ -190,6 +199,7 @@ function setupEventListeners() {
             };
             renderEditor();
         }
+        scheduleAutoSave();
     });
 
     // 阻止点击label区域触发checkbox
@@ -376,9 +386,11 @@ function renderVideoList() {
 
         // 使用视频在原始列表中的索引作为编号
         const videoNumber = String(video.index + 1).padStart(4, '0');
+        // 保持当前选中视频的高亮状态
+        const isActive = video.filename === currentVideo;
 
         return `
-            <div class="video-item" data-filename="${video.filename}">
+            <div class="video-item${isActive ? ' active' : ''}" data-filename="${video.filename}">
                 <div class="video-item-name">
                     <span class="video-number">#${videoNumber}</span>
                     <span>${video.filename}</span>
@@ -429,6 +441,11 @@ function filterVideos() {
 
 // 选择视频
 async function selectVideo(filename) {
+    // 切换视频前，立即保存当前标注（如果有未保存的更改）
+    if (currentVideo && currentVideo !== filename) {
+        await flushAutoSave();
+    }
+
     currentVideo = filename;
 
     // 更新列表选中状态
@@ -474,6 +491,9 @@ async function loadAnnotation(filename) {
         };
         renderEditor();
     }
+    // 重置自动保存状态，加载后的数据视为已保存
+    lastSavedAnnotationJSON = JSON.stringify(currentAnnotation);
+    updateAutoSaveStatus('');
 }
 
 // 渲染编辑器
@@ -535,6 +555,7 @@ function addStep() {
     }
     currentAnnotation.steps.push(newStep);
     addStepElement(newStep, currentAnnotation.steps.length - 1);
+    scheduleAutoSave();
 }
 
 // 添加步骤元素
@@ -599,6 +620,16 @@ function addStepElement(step, index) {
         if (currentAnnotation.steps[idx]) {
             currentAnnotation.steps[idx].timestamp = e.target.value;
         }
+        scheduleAutoSave();
+    });
+
+    // 时间戳实时输入同步（包括粘贴）
+    timestampInput.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.index);
+        if (currentAnnotation.steps[idx]) {
+            currentAnnotation.steps[idx].timestamp = e.target.value;
+        }
+        scheduleAutoSave();
     });
 
     // 阻止时间戳输入框的点击事件冒泡
@@ -613,6 +644,7 @@ function addStepElement(step, index) {
         if (currentAnnotation.steps[idx]) {
             currentAnnotation.steps[idx].description = e.target.value;
         }
+        scheduleAutoSave();
     });
 
     // 阻止描述输入框的点击事件冒泡
@@ -643,6 +675,7 @@ function addStepElement(step, index) {
             selectedStepIndex--;
         }
         renderEditor();
+        scheduleAutoSave();
     });
 
     stepsContainer.appendChild(stepDiv);
@@ -696,6 +729,7 @@ function handleDrop(e) {
         
         // 重新渲染
         renderEditor();
+        scheduleAutoSave();
     }
     
     return false;
@@ -711,8 +745,14 @@ function handleDragEnd(e) {
     });
 }
 
-// 保存标注
+// 保存标注（手动保存）
 async function saveAnnotation() {
+    // 取消待执行的自动保存
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+    }
+
     if (!currentVideo) {
         alert('Please select a video first');
         return;
@@ -763,6 +803,8 @@ async function saveAnnotation() {
         });
 
         if (response.ok) {
+            lastSavedAnnotationJSON = JSON.stringify(currentAnnotation);
+            updateAutoSaveStatus('saved');
             alert('Saved successfully');
             loadVideos(); // 刷新列表状态
         } else {
@@ -812,21 +854,17 @@ async function deleteAnnotation() {
 // 更新时间显示
 function updateTimeDisplay() {
     if (!player) return;
-    const time = player.currentTime();
-    const minutes = Math.floor(time / 60);
-    const seconds = time % 60;
-    const wholeSecs = Math.floor(seconds);
-    const millis = Math.floor((seconds - wholeSecs) * 1000);
-    currentTime.textContent = `${String(minutes).padStart(2, '0')}:${String(wholeSecs).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+    currentTime.textContent = formatTimestamp(player.currentTime());
 }
 
 // 格式化时间为 mm:ss.SSS
+// 使用 Math.round 转为整数毫秒后再拆分，避免浮点精度丢失导致的1ms偏差
 function formatTimestamp(timeInSeconds) {
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = timeInSeconds % 60;
-    const wholeSecs = Math.floor(seconds);
-    const millis = Math.floor((seconds - wholeSecs) * 1000);
-    return `${String(minutes).padStart(2, '0')}:${String(wholeSecs).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+    const totalMs = Math.round(timeInSeconds * 1000);
+    const minutes = Math.floor(totalMs / 60000);
+    const seconds = Math.floor((totalMs % 60000) / 1000);
+    const millis = totalMs % 1000;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
 }
 
 // 解析时间戳为秒数
@@ -904,6 +942,9 @@ function insertCurrentTimestamp() {
 
     // 暂停视频，方便用户输入描述
     player.pause();
+
+    // 触发自动保存
+    scheduleAutoSave();
 }
 
 // 跳转到指定时间戳
@@ -1190,6 +1231,124 @@ async function openBrowser(inputId, mode) {
     } catch (error) {
         console.error('Failed to open dialog:', error);
         alert('Failed to open dialog. Please paste the path manually.');
+    }
+}
+
+// ========== 自动保存功能 ==========
+
+// 调度自动保存（防抖）
+function scheduleAutoSave() {
+    if (!currentVideo || !currentAnnotation) return;
+
+    updateAutoSaveStatus('unsaved');
+
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+    }
+
+    autoSaveTimer = setTimeout(() => {
+        performAutoSave();
+    }, AUTO_SAVE_DELAY);
+}
+
+// 从表单同步数据到 currentAnnotation
+function syncAnnotationFromForm() {
+    if (!currentAnnotation) return;
+    if (currentAnnotation.is_tutorial) {
+        currentAnnotation.title = tutorialTitle.value.trim();
+    }
+    // 步骤数据已通过 input/change 事件实时同步
+}
+
+// 静默验证标注（不弹窗）
+function validateAnnotationSilently() {
+    if (!currentAnnotation) return false;
+
+    if (!currentAnnotation.is_tutorial) {
+        return true; // 非教学视频始终有效
+    }
+
+    if (!currentAnnotation.title) return false;
+    if (!currentAnnotation.steps || currentAnnotation.steps.length === 0) return false;
+
+    for (const step of currentAnnotation.steps) {
+        if (!/^\d{2}:\d{2}(\.\d{3})?$/.test(step.timestamp)) return false;
+        if (!step.description.trim()) return false;
+    }
+
+    return true;
+}
+
+// 执行自动保存
+async function performAutoSave() {
+    if (!currentVideo || !currentAnnotation) return;
+
+    syncAnnotationFromForm();
+
+    if (!validateAnnotationSilently()) {
+        return; // 数据不完整，暂不保存
+    }
+
+    const annotationJSON = JSON.stringify(currentAnnotation);
+    if (annotationJSON === lastSavedAnnotationJSON) {
+        updateAutoSaveStatus('saved');
+        return; // 无变化
+    }
+
+    updateAutoSaveStatus('saving');
+
+    try {
+        const stem = currentVideo.replace(/\.mp4$/, '');
+        const response = await fetch(`/api/annotation/${stem}.txt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: annotationJSON
+        });
+
+        if (response.ok) {
+            lastSavedAnnotationJSON = annotationJSON;
+            updateAutoSaveStatus('saved');
+            loadVideos(); // 刷新列表状态，更新"已标注"标签
+        } else {
+            updateAutoSaveStatus('error');
+        }
+    } catch (error) {
+        console.error('Auto-save failed:', error);
+        updateAutoSaveStatus('error');
+    }
+}
+
+// 立即执行自动保存（用于切换视频前）
+async function flushAutoSave() {
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+    }
+    await performAutoSave();
+}
+
+// 更新自动保存状态指示器
+function updateAutoSaveStatus(status) {
+    const statusEl = document.getElementById('autoSaveStatus');
+    if (!statusEl) return;
+
+    statusEl.className = 'auto-save-status ' + status;
+
+    switch(status) {
+        case 'unsaved':
+            statusEl.textContent = '● Unsaved';
+            break;
+        case 'saving':
+            statusEl.textContent = '⏳ Saving...';
+            break;
+        case 'saved':
+            statusEl.textContent = '✓ Saved';
+            break;
+        case 'error':
+            statusEl.textContent = '✕ Save failed';
+            break;
+        default:
+            statusEl.textContent = '';
     }
 }
 

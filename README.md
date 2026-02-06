@@ -10,6 +10,7 @@ mp4Label is a cross-platform video annotation tool built with Go, designed for a
 - 🤖 **Model Comparison**: Optional 4th panel to compare model vs human annotations (for algorithm engineers)
 - ✏️ **Annotation Editor**: Edit tutorial titles, timestamps, and step descriptions
 - 🎬 **Professional Player**: Video.js-based with zoom, fullscreen, speed control
+- 💾 **Auto-Save**: Real-time auto-save with visual status indicator
 - ⚡ **Quick Annotation**: One-click timestamp insertion with millisecond precision
 - 🎯 **Smart Insertion**: Press I to insert below selected step
 - 🎯 **Click to Seek**: Click timestamp to jump to video position
@@ -221,14 +222,14 @@ Contributions welcome! Please:
 
 ## 📌 Version
 
-Current version: **v0.2.6** (2026-02-05)
+Current version: **v0.2.7** (2026-02-06)
 
 Recent updates:
-- **v0.2.6** - Simplified configuration UI: removed misleading path selection buttons
+- **v0.2.7** - Auto-save annotations, fix 1ms timestamp precision issue
+- **v0.2.6** - Native OS file/folder dialogs for configuration
 - **v0.2.5** - Model annotation comparison panel for algorithm engineers
 - **v0.2.4** - Task file support, statistics display
 - **v0.2.3** - Keyboard shortcuts (0.5s), click-to-copy timestamp, bug fixes, documentation consolidation
-- **v0.2.2** - Video numbering, status filtering, time display optimization
 
 See [VERSION_HISTORY.md](VERSION_HISTORY.md) for complete history.
 

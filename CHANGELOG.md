@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.2.7] - 2026-02-06
+
+### New Features
+
+#### 💾 Auto-Save Annotations
+- Annotations are automatically saved 1.5 seconds after any edit (debounced)
+- Visual status indicator in editor header: "Unsaved" / "Saving..." / "Saved" / "Save failed"
+- Pending changes are flushed immediately when switching videos
+- Silent validation: only saves when data is complete and valid
+- Change detection skips unnecessary saves
+- Triggers: title input, step timestamp/description, add/remove step, drag-drop reorder, insert timestamp, non-tutorial toggle
+
+### Bug Fixes
+
+#### 🐛 1ms Timestamp Precision Fix
+- Fixed 1ms discrepancy when inserting or copying timestamps
+- Root cause: floating-point precision loss in `Math.floor((seconds - wholeSecs) * 1000)`
+- Fix: Convert to total integer milliseconds via `Math.round(timeInSeconds * 1000)` first
+- Timestamps now match video time exactly
+
+### Technical Changes
+- Added `scheduleAutoSave()`, `performAutoSave()`, `flushAutoSave()` functions
+- Added `syncAnnotationFromForm()`, `validateAnnotationSilently()` helpers
+- Added `updateAutoSaveStatus()` for visual feedback
+- Added `autoSaveStatus` element in editor header (HTML)
+- Added `.auto-save-status` styles with state variants (CSS)
+- Fixed `formatTimestamp()` to use integer millisecond arithmetic
+
+---
+
 ## [v0.2.6] - 2026-02-05
 
 ### New Features

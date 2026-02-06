@@ -1,6 +1,6 @@
 .PHONY: all clean install run windows linux darwin prepare-web clean-web all-platforms
 
-VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "v0.2.5")
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "v0.2.7")
 PKGBASE := github.com/xd/mp4label/cmd
 
 # Default target: build all platforms

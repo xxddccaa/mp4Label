@@ -2,6 +2,62 @@
 
 Complete version history and release notes for mp4Label.
 
+## [v0.2.7] - 2026-02-06
+
+### Overview
+Version 0.2.7 adds real-time auto-save for annotations and fixes a 1ms timestamp precision issue.
+
+### New Features
+
+#### 💾 Auto-Save Annotations
+- **Real-time saving**: Annotations are automatically saved 1.5 seconds after any edit
+- **Debounced writes**: Prevents excessive API calls; groups rapid edits into a single save
+- **Visual status indicator**: Shows "Unsaved", "Saving...", "Saved", or "Save failed" next to editor header
+- **Flush before navigation**: Switching videos immediately saves pending changes
+- **Silent validation**: Only auto-saves when annotation data is complete and valid
+- **Change detection**: Compares current data with last saved state to skip unnecessary saves
+- **Manual save still works**: "Save" button remains available for explicit saves (cancels pending auto-save)
+
+### Bug Fixes
+
+#### 🐛 1ms Timestamp Precision Fix
+- **Problem**: Inserting or copying timestamps showed a 1ms discrepancy from actual video time
+- **Root cause**: `Math.floor((seconds - wholeSecs) * 1000)` suffered from IEEE 754 floating-point precision loss
+- **Fix**: Now converts to total integer milliseconds via `Math.round(timeInSeconds * 1000)` first, then extracts minutes, seconds, and millis from that integer
+- **Result**: Timestamps now match video time exactly with zero offset
+
+### Technical Implementation
+
+#### Auto-Save System
+- `scheduleAutoSave()`: Debounced scheduler (1.5s delay)
+- `performAutoSave()`: Validates, checks for changes, then sends POST request
+- `flushAutoSave()`: Immediate save for video switching
+- `syncAnnotationFromForm()`: Syncs form inputs to data model before saving
+- `validateAnnotationSilently()`: Checks data completeness without alert dialogs
+- `updateAutoSaveStatus(status)`: Updates the visual status indicator
+
+#### Trigger Points
+- Tutorial title input
+- Step timestamp change/input (including paste)
+- Step description input
+- Add step / Remove step
+- Drag-and-drop step reorder
+- Insert timestamp (I key or button)
+- Non-tutorial checkbox toggle
+
+#### Timestamp Fix
+- `formatTimestamp()`: Uses integer arithmetic to avoid floating-point rounding errors
+- Before: `Math.floor((seconds - wholeSecs) * 1000)` → could lose 1ms
+- After: `Math.round(timeInSeconds * 1000)` → exact millisecond value
+
+### User Workflow Improvement
+- **Before**: Annotators lost all work when navigating to another video without saving
+- **After**: All edits are automatically saved in real-time; no data loss
+- **Before**: Timestamps off by 1ms required manual correction
+- **After**: Timestamps match video time exactly
+
+---
+
 ## [v0.2.6] - 2026-02-05
 
 ### Overview
