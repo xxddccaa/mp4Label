@@ -2,6 +2,74 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.2.9] - 2026-02-11
+
+### New Features
+
+#### 📂 Task Directory (Task Groups)
+- New `task_dir` config field: directory containing multiple `.txt` task files as selectable task groups
+- Sidebar dropdown selector: switch between task groups to filter video list dynamically
+- "All Videos" option shows all videos unfiltered (ignores task_dir and task_file)
+- Live video count in dropdown label
+- Works in both `web` and `view` modes
+- Config modal: new "Task Directory" input with browse button
+- Saved to `~/.mp4label/config.json`
+
+#### 🔌 New API Endpoints
+- `GET /api/task-groups` — lists available task group files from TaskDir
+- `GET /api/videos?task=filename.txt` — filters videos by specific task file
+
+### CLI Changes
+- Added `-task-dir` flag to both `web` and `view` subcommands
+- Conflict: `-task-dir` takes priority over `-task-file` with WARNING message
+- CLI flags override config file values
+
+### Technical Changes
+- Backend: Added `TaskDir` field to `Config` struct with validation
+- Backend: New `handleTaskGroups` handler scans TaskDir for `.txt` files
+- Backend: `handleVideos` parses `?task=` query param with path traversal protection
+- Backend: "All Videos" mode bypasses both TaskFile and TaskDir filtering
+- Frontend: New `loadTaskGroups()` function, `taskGroupSelect` change handler
+- Frontend: `loadVideos()` appends `?task=` param when task group selected
+- Frontend: `saveConfig()` includes `task_dir` field, refreshes task groups after save
+- Frontend: `updateStatsDisplay()` shows video count in task group label
+- CSS: `.task-group-selector` styled with blue border for visual prominence
+
+---
+
+## [v0.2.8] - 2026-02-11
+
+### New Features
+
+#### 👁️ Read-Only View Mode
+- New `view` subcommand for read-only annotation review
+- All config parameters specifiable via CLI flags (`-video-dir`, `-output-dir`, `-pre-annotation-dir`, `-task-file`, `-model-annotation-dir`, `-port`)
+- Config file not read or written in view mode
+- Backend blocks all write operations with HTTP 403 in view mode
+- Frontend disables all editing UI: buttons, inputs, auto-save, keyboard shortcuts
+- Visual "View Only" badge in header and "🔒 View Only" status indicator
+
+#### 🔌 New API Endpoint
+- `GET /api/mode` returns `{"readonly": true/false}` for frontend mode detection
+
+### Technical Changes
+- Backend: Added `NewServerWithConfig()` constructor for direct config injection
+- Backend: Added `readOnly` field to `Server` struct
+- Backend: Read-only guards on `saveAnnotation`, `deleteAnnotation`, `saveConfig`, `handleDialog`
+- Backend: New `handleMode` endpoint
+- Frontend: Added `loadMode()`, `applyReadOnlyMode()` functions
+- Frontend: All editing functions guarded with `isReadOnly` check
+- Frontend: `addStepElement()` respects read-only mode (no drag, no remove button, readonly inputs)
+- Frontend: Config modal adapts to read-only mode (disabled inputs, hidden browse/save buttons)
+- CSS: Added `.readonly-badge`, `.readonly-mode` styles, disabled button styling
+
+### CLI Changes
+```
+mp4label view -video-dir /path -output-dir /path [-port 8080] [-pre-annotation-dir ...] [-task-file ...] [-model-annotation-dir ...]
+```
+
+---
+
 ## [v0.2.7] - 2026-02-06
 
 ### New Features

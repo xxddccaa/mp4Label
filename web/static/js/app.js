@@ -1,15 +1,18 @@
-// 全局状态
+// Global state
 let currentVideo = null;
 let currentAnnotation = null;
-let currentModelAnnotation = null; // 模型标注数据
+let currentModelAnnotation = null; // Model annotation data
 let videos = [];
-let videoStats = null; // 视频统计信息
+let videoStats = null; // Video statistics
 let config = null;
-let player = null; // Video.js player 实例
-let selectedStepIndex = -1; // 当前选中的步骤索引，-1 表示没有选中
-let currentFilter = 'all'; // 当前筛选状态
-let autoSaveTimer = null; // 自动保存定时器
-let lastSavedAnnotationJSON = null; // 上次保存的标注JSON，用于检测变化
+let player = null; // Video.js player instance
+let selectedStepIndex = -1; // Currently selected step index, -1 = none
+let currentFilter = 'all'; // Current filter state
+let autoSaveTimer = null; // Auto-save timer
+let lastSavedAnnotationJSON = null; // Last saved annotation JSON for change detection
+let isReadOnly = false; // Read-only mode flag (set by server /api/mode)
+let taskGroups = []; // Available task group filenames from TaskDir
+let currentTaskGroup = ''; // Currently selected task group filename ('' = All Videos)
 
 const AUTO_SAVE_DELAY = 1500; // 自动保存延迟（毫秒）
 
@@ -33,18 +36,72 @@ const saveConfigBtn = document.getElementById('saveConfigBtn');
 const cancelConfigBtn = document.getElementById('cancelConfigBtn');
 const insertTimestampBtn = document.getElementById('insertTimestampBtn');
 const playbackRate = document.getElementById('playbackRate');
+const taskGroupSelector = document.getElementById('taskGroupSelector');
+const taskGroupSelect = document.getElementById('taskGroupSelect');
 
 
-// 初始化
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
     initVideoPlayer();
-    loadConfig();
+    await loadMode(); // Must load mode first before other setup
+    await loadConfig();
+    await loadTaskGroups(); // Load task groups before videos (determines filtering)
     loadVideos();
     setupEventListeners();
     setupResizableHandles();
+    if (isReadOnly) {
+        applyReadOnlyMode();
+    }
 });
 
-// 初始化 Video.js 播放器
+// Load server mode (read-only or edit)
+async function loadMode() {
+    try {
+        const response = await fetch('/api/mode');
+        const data = await response.json();
+        isReadOnly = data.readonly === true;
+    } catch (error) {
+        console.error('Failed to load mode:', error);
+        isReadOnly = false;
+    }
+}
+
+// Apply read-only mode: disable all editing controls, show visual indicator
+function applyReadOnlyMode() {
+    // Add read-only class to body for CSS styling
+    document.body.classList.add('readonly-mode');
+
+    // Show read-only badge in header
+    const header = document.querySelector('.header h1');
+    if (header) {
+        const badge = document.createElement('span');
+        badge.className = 'readonly-badge';
+        badge.textContent = 'View Only';
+        header.appendChild(badge);
+    }
+
+    // Disable annotation editing buttons
+    saveBtn.disabled = true;
+    saveBtn.title = 'Disabled in view mode';
+    deleteAnnotationBtn.disabled = true;
+    deleteAnnotationBtn.title = 'Disabled in view mode';
+    addStepBtn.disabled = true;
+    addStepBtn.title = 'Disabled in view mode';
+    insertTimestampBtn.disabled = true;
+    insertTimestampBtn.title = 'Disabled in view mode';
+
+    // Make tutorial title input readonly
+    tutorialTitle.readOnly = true;
+    tutorialTitle.title = 'Read-only in view mode';
+
+    // Disable non-tutorial checkbox
+    notTutorialCheck.disabled = true;
+
+    // Config button: opens modal but in read-only view
+    // (handled in loadConfigToForm and saveConfig)
+}
+
+// Initialize Video.js player
 function initVideoPlayer() {
     player = videojs('videoPlayer', {
         controls: true,
@@ -96,15 +153,17 @@ function initVideoPlayer() {
             e.preventDefault();
             player.currentTime(Math.min(player.duration(), player.currentTime() + 0.5));
         }
-        // I 键：插入时间戳
+        // I key: insert timestamp (disabled in read-only mode)
         else if (e.keyCode === 73) {
             e.preventDefault();
-            insertCurrentTimestamp();
+            if (!isReadOnly) {
+                insertCurrentTimestamp();
+            }
         }
     });
 }
 
-// 设置事件监听
+// Setup event listeners
 function setupEventListeners() {
     // 搜索
     searchInput.addEventListener('input', filterVideos);
@@ -175,15 +234,21 @@ function setupEventListeners() {
                 e.preventDefault();
                 player.currentTime(Math.min(player.duration(), player.currentTime() + 0.5));
                 break;
-            case 73: // I键：插入时间戳
+            case 73: // I key: insert timestamp (disabled in read-only mode)
                 e.preventDefault();
-                insertCurrentTimestamp();
+                if (!isReadOnly) {
+                    insertCurrentTimestamp();
+                }
                 break;
         }
     });
 
-    // 非教学视频复选框 - 只响应checkbox自身的change事件
+    // Non-tutorial checkbox - only responds to checkbox's own change event
     notTutorialCheck.addEventListener('change', (e) => {
+        if (isReadOnly) {
+            e.preventDefault();
+            return;
+        }
         if (e.target.checked) {
             currentAnnotation = {
                 title: '',
@@ -211,7 +276,28 @@ function setupEventListeners() {
         }
     });
 
-    // 配置对话框
+    // Task group selector change event
+    taskGroupSelect.addEventListener('change', async (e) => {
+        // Flush any pending auto-save before switching
+        if (currentVideo) {
+            await flushAutoSave();
+        }
+        currentTaskGroup = e.target.value;
+        currentVideo = null;
+        currentAnnotation = null;
+        currentModelAnnotation = null;
+        // Reload video list with new task group filter
+        await loadVideos();
+        // Reset editor
+        tutorialTitle.value = '';
+        stepsContainer.innerHTML = '';
+        currentVideoName.textContent = 'Select a video';
+        if (player) {
+            player.reset();
+        }
+    });
+
+    // Config dialog
     configBtn.addEventListener('click', () => {
         configModal.style.display = 'block';
         loadConfigToForm();
@@ -239,14 +325,51 @@ function setupEventListeners() {
     });
 }
 
-// 加载配置
+// Load config
 async function loadConfig() {
     try {
         const response = await fetch('/api/config');
         config = await response.json();
         updateModelPanelVisibility();
     } catch (error) {
-        console.error('加载配置失败:', error);
+        console.error('Failed to load config:', error);
+    }
+}
+
+// Load task groups from /api/task-groups
+async function loadTaskGroups() {
+    try {
+        const response = await fetch('/api/task-groups');
+        const data = await response.json();
+
+        if (data.available && data.groups && data.groups.length > 0) {
+            taskGroups = data.groups;
+
+            // Build <option> list
+            taskGroupSelect.innerHTML = '<option value="">📋 All Videos</option>';
+            taskGroups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group;
+                option.textContent = group;
+                taskGroupSelect.appendChild(option);
+            });
+
+            // Default select first task group
+            taskGroupSelect.value = taskGroups[0];
+            currentTaskGroup = taskGroups[0];
+
+            // Show the selector
+            taskGroupSelector.style.display = 'block';
+        } else {
+            taskGroups = [];
+            currentTaskGroup = '';
+            taskGroupSelector.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Failed to load task groups:', error);
+        taskGroups = [];
+        currentTaskGroup = '';
+        taskGroupSelector.style.display = 'none';
     }
 }
 
@@ -260,21 +383,43 @@ function updateModelPanelVisibility() {
     }
 }
 
-// 加载配置到表单
+// Load config to form
 function loadConfigToForm() {
     document.getElementById('videoDir').value = config?.video_dir || '';
     document.getElementById('preAnnotationDir').value = config?.pre_annotation_dir || '';
     document.getElementById('outputDir').value = config?.output_dir || '';
     document.getElementById('taskFile').value = config?.task_file || '';
+    document.getElementById('taskDir').value = config?.task_dir || '';
     document.getElementById('modelAnnotationDir').value = config?.model_annotation_dir || '';
+
+    // In read-only mode, disable all config form inputs and hide action buttons
+    if (isReadOnly) {
+        const configInputs = configModal.querySelectorAll('input[type="text"]');
+        configInputs.forEach(input => {
+            input.readOnly = true;
+            input.style.backgroundColor = '#e9ecef';
+        });
+        // Hide browse buttons
+        const browseButtons = configModal.querySelectorAll('.config-form .btn.btn-secondary:not(#cancelConfigBtn)');
+        browseButtons.forEach(btn => {
+            if (btn.textContent.trim() === '📁' || btn.textContent.trim() === '📄') {
+                btn.style.display = 'none';
+            }
+        });
+        // Hide save button, change cancel to "Close"
+        saveConfigBtn.style.display = 'none';
+        cancelConfigBtn.textContent = 'Close';
+    }
 }
 
-// 保存配置
+// Save config (blocked in read-only mode)
 async function saveConfig() {
+    if (isReadOnly) return;
     const videoDir = document.getElementById('videoDir').value.trim();
     const preAnnotationDir = document.getElementById('preAnnotationDir').value.trim();
     const outputDir = document.getElementById('outputDir').value.trim();
     const taskFile = document.getElementById('taskFile').value.trim();
+    const taskDir = document.getElementById('taskDir').value.trim();
     const modelAnnotationDir = document.getElementById('modelAnnotationDir').value.trim();
 
     if (!videoDir || !outputDir) {
@@ -293,6 +438,7 @@ async function saveConfig() {
                 pre_annotation_dir: preAnnotationDir || '',
                 output_dir: outputDir,
                 task_file: taskFile || '',
+                task_dir: taskDir || '',
                 model_annotation_dir: modelAnnotationDir || ''
             })
         });
@@ -301,6 +447,7 @@ async function saveConfig() {
             configModal.style.display = 'none';
             await loadConfig();
             updateModelPanelVisibility();
+            await loadTaskGroups(); // Refresh task groups (TaskDir may have changed)
             loadVideos();
             alert('Configuration saved successfully');
         } else {
@@ -313,10 +460,14 @@ async function saveConfig() {
     }
 }
 
-// 加载视频列表
+// Load video list (with optional task group filter)
 async function loadVideos() {
     try {
-        const response = await fetch('/api/videos');
+        let url = '/api/videos';
+        if (currentTaskGroup) {
+            url += '?task=' + encodeURIComponent(currentTaskGroup);
+        }
+        const response = await fetch(url);
         const data = await response.json();
         
         // 处理新的响应格式
@@ -342,7 +493,7 @@ async function loadVideos() {
     }
 }
 
-// 更新统计信息显示
+// Update statistics display
 function updateStatsDisplay() {
     const statsPanel = document.getElementById('statsPanel');
     if (!videoStats) {
@@ -356,6 +507,18 @@ function updateStatsDisplay() {
     document.getElementById('statsUnannotated').textContent = videoStats.unannotated || 0;
     
     statsPanel.style.display = 'block';
+
+    // Update task group selector label with count indicator
+    if (taskGroups.length > 0) {
+        const label = taskGroupSelector.querySelector('label');
+        if (label) {
+            if (currentTaskGroup) {
+                label.textContent = `Task Group (${videoStats.total || 0} videos):`;
+            } else {
+                label.textContent = `Task Group (All - ${videoStats.total || 0} videos):`;
+            }
+        }
+    }
 }
 
 // 渲染视频列表
@@ -491,9 +654,13 @@ async function loadAnnotation(filename) {
         };
         renderEditor();
     }
-    // 重置自动保存状态，加载后的数据视为已保存
+    // Reset auto-save state, loaded data is considered saved
     lastSavedAnnotationJSON = JSON.stringify(currentAnnotation);
-    updateAutoSaveStatus('');
+    if (isReadOnly) {
+        updateAutoSaveStatus('readonly');
+    } else {
+        updateAutoSaveStatus('');
+    }
 }
 
 // 渲染编辑器
@@ -513,10 +680,13 @@ function renderEditor() {
         return;
     }
 
-    // 教学视频
+    // Tutorial video
     notTutorialGroup.style.display = 'block';
     notTutorialCheck.checked = false;
     tutorialTitle.disabled = false;
+    if (isReadOnly) {
+        tutorialTitle.readOnly = true;
+    }
     tutorialTitle.value = currentAnnotation.title || '';
 
     // 渲染步骤
@@ -537,8 +707,9 @@ function renderEditor() {
     }
 }
 
-// 添加步骤
+// Add step (blocked in read-only mode)
 function addStep() {
+    if (isReadOnly) return;
     if (!currentAnnotation || !currentAnnotation.is_tutorial) {
         return;
     }
@@ -576,18 +747,19 @@ function selectStep(index) {
 function addStepElement(step, index) {
     const stepDiv = document.createElement('div');
     stepDiv.className = 'step-item';
-    stepDiv.draggable = true;
+    stepDiv.draggable = !isReadOnly; // Disable drag in read-only mode
     stepDiv.dataset.index = index;
     stepDiv.innerHTML = `
         <div class="step-header">
-            <span class="step-drag-handle" title="Drag to reorder">⋮⋮</span>
+            <span class="step-drag-handle" title="Drag to reorder" ${isReadOnly ? 'style="display:none"' : ''}>⋮⋮</span>
             <span class="step-number">Step ${step.number}</span>
             <input type="text" class="step-timestamp clickable" value="${step.timestamp}" 
-                   placeholder="00:00.000" data-index="${index}" title="Click to seek to this time">
+                   placeholder="00:00.000" data-index="${index}" title="Click to seek to this time"
+                   ${isReadOnly ? 'readonly' : ''}>
         </div>
         <textarea class="step-description" data-index="${index}" 
-                  placeholder="Enter step description...">${step.description || ''}</textarea>
-        <button class="step-remove" data-index="${index}">×</button>
+                  placeholder="Enter step description..." ${isReadOnly ? 'readonly' : ''}>${step.description || ''}</textarea>
+        <button class="step-remove" data-index="${index}" ${isReadOnly ? 'style="display:none"' : ''}>×</button>
     `;
 
     // 点击步骤容器选中该步骤
@@ -745,9 +917,11 @@ function handleDragEnd(e) {
     });
 }
 
-// 保存标注（手动保存）
+// Save annotation (manual save, blocked in read-only mode)
 async function saveAnnotation() {
-    // 取消待执行的自动保存
+    if (isReadOnly) return;
+
+    // Cancel pending auto-save
     if (autoSaveTimer) {
         clearTimeout(autoSaveTimer);
         autoSaveTimer = null;
@@ -817,8 +991,9 @@ async function saveAnnotation() {
     }
 }
 
-// 删除标注
+// Delete annotation (blocked in read-only mode)
 async function deleteAnnotation() {
+    if (isReadOnly) return;
     if (!currentVideo) {
         alert('Please select a video first');
         return;
@@ -886,8 +1061,9 @@ function parseTimestamp(timestamp) {
     return minutes * 60 + seconds + millis / 1000;
 }
 
-// 插入当前时间戳
+// Insert current timestamp (blocked in read-only mode)
 function insertCurrentTimestamp() {
+    if (isReadOnly) return;
     if (!player || !currentAnnotation || !currentAnnotation.is_tutorial) {
         return;
     }
@@ -1214,8 +1390,9 @@ function escapeHtml(text) {
 }
 
 
-// Open native file/folder dialog and set the selected path.
+// Open native file/folder dialog and set the selected path (blocked in read-only mode)
 async function openBrowser(inputId, mode) {
+    if (isReadOnly) return;
     try {
         const response = await fetch(`/api/dialog?mode=${encodeURIComponent(mode)}`);
         if (!response.ok) {
@@ -1236,8 +1413,9 @@ async function openBrowser(inputId, mode) {
 
 // ========== 自动保存功能 ==========
 
-// 调度自动保存（防抖）
+// Schedule auto-save (debounced, disabled in read-only mode)
 function scheduleAutoSave() {
+    if (isReadOnly) return;
     if (!currentVideo || !currentAnnotation) return;
 
     updateAutoSaveStatus('unsaved');
@@ -1318,8 +1496,9 @@ async function performAutoSave() {
     }
 }
 
-// 立即执行自动保存（用于切换视频前）
+// Flush auto-save immediately (used before switching videos)
 async function flushAutoSave() {
+    if (isReadOnly) return;
     if (autoSaveTimer) {
         clearTimeout(autoSaveTimer);
         autoSaveTimer = null;
@@ -1327,7 +1506,7 @@ async function flushAutoSave() {
     await performAutoSave();
 }
 
-// 更新自动保存状态指示器
+// Update auto-save status indicator
 function updateAutoSaveStatus(status) {
     const statusEl = document.getElementById('autoSaveStatus');
     if (!statusEl) return;
@@ -1346,6 +1525,9 @@ function updateAutoSaveStatus(status) {
             break;
         case 'error':
             statusEl.textContent = '✕ Save failed';
+            break;
+        case 'readonly':
+            statusEl.textContent = '🔒 View Only';
             break;
         default:
             statusEl.textContent = '';

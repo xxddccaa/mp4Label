@@ -18,13 +18,14 @@ import (
 	"github.com/xd/mp4label/pkg/video"
 )
 
-// Server 表示 Web 服务器
+// Server represents the web server
 type Server struct {
-	config *config.Config
-	webFS  embed.FS
+	config   *config.Config
+	webFS    embed.FS
+	readOnly bool // When true, all write operations are blocked (view mode)
 }
 
-// NewServer 创建新的服务器实例
+// NewServer creates a new server instance in edit mode (loads config from file)
 func NewServer(webFS embed.FS) (*Server, error) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -32,8 +33,19 @@ func NewServer(webFS embed.FS) (*Server, error) {
 	}
 
 	return &Server{
-		config: cfg,
-		webFS:  webFS,
+		config:   cfg,
+		webFS:    webFS,
+		readOnly: false,
+	}, nil
+}
+
+// NewServerWithConfig creates a new server instance with a provided config.
+// If readOnly is true, all write operations (save/delete annotation, save config, dialogs) are blocked.
+func NewServerWithConfig(webFS embed.FS, cfg *config.Config, readOnly bool) (*Server, error) {
+	return &Server{
+		config:   cfg,
+		webFS:    webFS,
+		readOnly: readOnly,
 	}, nil
 }
 
@@ -46,6 +58,8 @@ func (s *Server) Start(port string) error {
 	http.HandleFunc("/api/video/", s.handleVideo)
 	http.HandleFunc("/api/config", s.handleConfig)
 	http.HandleFunc("/api/dialog", s.handleDialog)
+	http.HandleFunc("/api/mode", s.handleMode)
+	http.HandleFunc("/api/task-groups", s.handleTaskGroups)
 
 	// 静态文件服务 - 使用嵌入的文件系统
 	staticFS, err := fs.Sub(s.webFS, "web/static")
@@ -79,14 +93,52 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// handleVideos 处理视频列表请求
+// handleVideos handles video list requests
+// Supports ?task=filename.txt query parameter to filter by a task file in TaskDir.
+// When TaskDir is configured and no ?task= parameter is given, shows ALL videos (ignores TaskFile).
 func (s *Server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	videos, err := video.ScanVideos(s.config.VideoDir, s.config.TaskFile)
+	// Determine which task file to use for filtering
+	taskFilePath := ""
+	taskParam := r.URL.Query().Get("task")
+
+	if taskParam != "" && s.config.TaskDir != "" {
+		// Validate task parameter: no path traversal
+		if strings.Contains(taskParam, "..") || strings.Contains(taskParam, "/") || strings.Contains(taskParam, "\\") {
+			http.Error(w, "Invalid task parameter", http.StatusBadRequest)
+			return
+		}
+		if !strings.HasSuffix(taskParam, ".txt") {
+			http.Error(w, "Task file must be a .txt file", http.StatusBadRequest)
+			return
+		}
+		// Build full path and verify it's within TaskDir
+		fullPath := filepath.Join(s.config.TaskDir, taskParam)
+		absTaskDir, _ := filepath.Abs(s.config.TaskDir)
+		absFullPath, _ := filepath.Abs(fullPath)
+		if !strings.HasPrefix(absFullPath, absTaskDir+string(filepath.Separator)) {
+			http.Error(w, "Invalid task parameter", http.StatusBadRequest)
+			return
+		}
+		// Verify file exists
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			http.Error(w, fmt.Sprintf("Task file not found: %s", taskParam), http.StatusNotFound)
+			return
+		}
+		taskFilePath = fullPath
+	} else if taskParam == "" && s.config.TaskDir != "" {
+		// TaskDir is configured but no task selected => show ALL videos (ignore TaskFile)
+		taskFilePath = ""
+	} else {
+		// No TaskDir configured, use single TaskFile if set
+		taskFilePath = s.config.TaskFile
+	}
+
+	videos, err := video.ScanVideos(s.config.VideoDir, taskFilePath)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to scan videos: %v", err), http.StatusInternalServerError)
 		return
@@ -99,7 +151,7 @@ func (s *Server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	totalCount := len(videos)
 	annotatedCount := 0
 	preAnnotatedCount := 0
-	
+
 	for _, v := range videos {
 		if v.HasAnnotation {
 			annotatedCount++
@@ -112,10 +164,10 @@ func (s *Server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"videos": videos,
 		"stats": map[string]int{
-			"total":        totalCount,
-			"annotated":    annotatedCount,
+			"total":         totalCount,
+			"annotated":     annotatedCount,
 			"pre_annotated": preAnnotatedCount,
-			"unannotated":  totalCount - annotatedCount - preAnnotatedCount,
+			"unannotated":   totalCount - annotatedCount - preAnnotatedCount,
 		},
 	}
 
@@ -186,8 +238,12 @@ func (s *Server) getAnnotation(w http.ResponseWriter, r *http.Request, stem stri
 	json.NewEncoder(w).Encode(ann)
 }
 
-// saveAnnotation 保存标注
+// saveAnnotation saves an annotation (blocked in read-only mode)
 func (s *Server) saveAnnotation(w http.ResponseWriter, r *http.Request, stem string) {
+	if s.readOnly {
+		http.Error(w, "Cannot save annotation: server is in read-only view mode", http.StatusForbidden)
+		return
+	}
 	if s.config.OutputDir == "" {
 		http.Error(w, "Output directory not set", http.StatusBadRequest)
 		return
@@ -216,8 +272,12 @@ func (s *Server) saveAnnotation(w http.ResponseWriter, r *http.Request, stem str
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
-// deleteAnnotation 删除标注
+// deleteAnnotation deletes an annotation (blocked in read-only mode)
 func (s *Server) deleteAnnotation(w http.ResponseWriter, r *http.Request, stem string) {
+	if s.readOnly {
+		http.Error(w, "Cannot delete annotation: server is in read-only view mode", http.StatusForbidden)
+		return
+	}
 	if s.config.OutputDir == "" {
 		http.Error(w, "Output directory not set", http.StatusBadRequest)
 		return
@@ -257,7 +317,7 @@ func (s *Server) handleVideo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	videoPath := filepath.Join(s.config.VideoDir, filename)
-	
+
 	// 安全检查：确保文件在视频目录内（使用绝对路径比较）
 	absVideoDir, err := filepath.Abs(s.config.VideoDir)
 	if err != nil {
@@ -337,7 +397,7 @@ func (s *Server) getModelAnnotation(w http.ResponseWriter, r *http.Request, stem
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"available": true,
+		"available":  true,
 		"annotation": ann,
 	})
 }
@@ -360,8 +420,12 @@ func (s *Server) getConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(s.config)
 }
 
-// saveConfig 保存配置
+// saveConfig saves configuration (blocked in read-only mode)
 func (s *Server) saveConfig(w http.ResponseWriter, r *http.Request) {
+	if s.readOnly {
+		http.Error(w, "Cannot save config: server is in read-only view mode", http.StatusForbidden)
+		return
+	}
 	var cfg config.Config
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to parse request: %v", err), http.StatusBadRequest)
@@ -386,10 +450,15 @@ func (s *Server) saveConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
-// handleDialog opens a native file/folder picker dialog and returns the selected path.
+// handleDialog opens a native file/folder picker dialog (blocked in read-only mode)
 func (s *Server) handleDialog(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.readOnly {
+		http.Error(w, "Cannot open dialog: server is in read-only view mode", http.StatusForbidden)
 		return
 	}
 
@@ -407,6 +476,57 @@ func (s *Server) handleDialog(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"path": path})
+}
+
+// handleTaskGroups returns the list of task group files in TaskDir
+func (s *Server) handleTaskGroups(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// If TaskDir is not configured, return unavailable
+	if s.config.TaskDir == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"available": false,
+			"groups":    []string{},
+		})
+		return
+	}
+
+	// Scan TaskDir for .txt files
+	entries, err := os.ReadDir(s.config.TaskDir)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to read task directory: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	var groups []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(strings.ToLower(entry.Name()), ".txt") {
+			groups = append(groups, entry.Name())
+		}
+	}
+
+	// groups are already sorted alphabetically by os.ReadDir
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"available": true,
+		"groups":    groups,
+	})
+}
+
+// handleMode returns the server mode (read-only or edit)
+func (s *Server) handleMode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"readonly": s.readOnly})
 }
 
 func openNativeDialog(mode string) (string, error) {

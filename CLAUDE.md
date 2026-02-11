@@ -292,12 +292,17 @@ Before releasing a new version, test:
 ```
 GET  /                           Main page
 GET  /api/videos                 List videos
+GET  /api/videos?task=xxx.txt    List videos filtered by task group
 GET  /api/video/:filename        Stream video
 GET  /api/annotation/:filename   Get annotation
 POST /api/annotation/:filename   Save annotation
 DELETE /api/annotation/:filename Delete annotation
+GET  /api/model-annotation/:filename  Get model annotation
 GET  /api/config                 Get config
 POST /api/config                 Save config
+GET  /api/mode                   Get server mode (readonly/edit)
+GET  /api/task-groups            List available task groups from TaskDir
+GET  /api/dialog                 Open native file/folder dialog
 ```
 
 ## Project History Context
@@ -313,14 +318,18 @@ POST /api/config                 Save config
 - **v0.2.5** (2026-02-05): Model annotation comparison panel
 - **v0.2.6** (2026-02-05): Native OS file/folder dialogs
 - **v0.2.7** (2026-02-06): Auto-save annotations, 1ms timestamp fix
+- **v0.2.8** (2026-02-11): Read-only view mode with CLI config
+- **v0.2.9** (2026-02-11): Task directory with switchable task groups
 
-### Recent Changes (v0.2.7)
+### Recent Changes (v0.2.9)
 
-1. **Auto-save:** Annotations auto-saved 1.5s after any edit with debouncing
-2. **Status indicator:** Visual feedback (Unsaved/Saving/Saved/Error) in editor header
-3. **Flush on navigate:** Pending changes saved immediately when switching videos
-4. **Timestamp fix:** Fixed 1ms precision error caused by floating-point rounding
-5. **Change detection:** Skips redundant saves when data hasn't changed
+1. **Task directory:** New `task_dir` config field for directory of `.txt` task files
+2. **Task group selector:** Sidebar dropdown to switch between task groups
+3. **"All Videos" option:** Shows all videos unfiltered when selected
+4. **New API:** `GET /api/task-groups` lists task files, `GET /api/videos?task=xxx` filters
+5. **CLI flag:** `-task-dir` for both `web` and `view` subcommands
+6. **Conflict handling:** `-task-dir` takes priority over `-task-file` with WARNING
+7. **Config modal:** New "Task Directory" input with browse button
 
 ## Important Notes for AI Assistants
 
@@ -412,5 +421,5 @@ For questions or issues:
 
 ---
 
-**Last Updated:** 2026-02-06 (v0.2.7)  
+**Last Updated:** 2026-02-11 (v0.2.9)  
 **Maintained for:** AI-assisted development with Claude and similar tools

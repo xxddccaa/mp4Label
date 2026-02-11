@@ -485,6 +485,7 @@ Format:
   "pre_annotation_dir": "/path/to/pre-annotations",
   "output_dir": "/path/to/output",
   "task_file": "/path/to/task.txt",
+  "task_dir": "/path/to/task-directory",
   "model_annotation_dir": "/path/to/model-annotations"
 }
 ```
@@ -495,6 +496,7 @@ Format:
 - **pre_annotation_dir**: Optional, will be ignored if not set
 - **output_dir**: Must exist and be writable
 - **task_file**: Optional, text file specifying which videos to annotate
+- **task_dir**: Optional, directory with multiple `.txt` task files as selectable task groups
 - **model_annotation_dir**: Optional, for algorithm engineers to compare model annotations
 
 ### Task File Feature (v0.2.4+)
@@ -535,6 +537,53 @@ beginner_guide_chapter2
 - Video names are matched exactly (case-sensitive)
 - The `.mp4` extension is automatically removed if present in the file
 - Videos not in the task file are completely hidden from the interface
+
+### Task Directory Feature (v0.2.9+)
+
+The task directory feature extends the single task file by supporting **multiple task files in a directory**, each representing a task group. Users can switch between groups via a dropdown selector in the sidebar.
+
+#### When to Use
+
+- **Team annotation**: Each annotator has their own `.txt` file, selects their group from the dropdown
+- **QA review**: Reviewer switches between groups to check different annotator's work
+- **Large projects**: Split thousands of videos into manageable groups
+
+#### Setup
+
+1. Create a directory with multiple `.txt` task files:
+```
+/tasks/
+  ├── annotator_alice.txt    # video names for Alice
+  ├── annotator_bob.txt      # video names for Bob
+  └── annotator_carol.txt    # video names for Carol
+```
+
+2. Configure via:
+   - **Config modal**: Set "Task Directory" field
+   - **CLI**: `mp4label web -task-dir /tasks` or `mp4label view ... -task-dir /tasks`
+
+#### How It Works
+
+1. A dropdown appears at top of sidebar with all `.txt` files from the directory
+2. Default: first task file is selected
+3. "All Videos" option shows every video (ignores all task filtering)
+4. Switching task group reloads the video list with that group's filter
+5. Statistics update to reflect the current group
+
+#### Priority Rules
+
+| Config | Behavior |
+|--------|----------|
+| Only `task_file` set | Single filter, no dropdown |
+| Only `task_dir` set | Dropdown with groups + "All Videos" |
+| Both set | `task_dir` takes priority, WARNING logged |
+| Neither set | All videos shown, no dropdown |
+
+#### CLI Conflict Handling
+
+When both `-task-dir` and `-task-file` are specified:
+- `-task-dir` wins
+- Clear WARNING printed to console: `WARNING: Both -task-dir and -task-file specified. Using -task-dir (ignoring -task-file).`
 
 ### Model Annotation Comparison (v0.2.5+)
 
@@ -615,6 +664,55 @@ The application automatically handles:
 - Leading/trailing whitespace
 
 You can paste paths directly from terminal without manual cleanup.
+
+### View Mode (Read-Only) (v0.2.8+)
+
+The `view` subcommand launches the server in **read-only mode**, where all editing is disabled. Config is specified entirely via CLI flags — the config file (`~/.mp4label/config.json`) is not read or modified.
+
+#### Usage
+
+```bash
+mp4label view -video-dir /path/to/videos -output-dir /path/to/annotations
+```
+
+#### All Flags
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `-video-dir` | Yes | Video directory path |
+| `-output-dir` | Yes | Output/annotation directory path |
+| `-port` | No | Server port (default: 8080) |
+| `-pre-annotation-dir` | No | Pre-annotation directory |
+| `-task-file` | No | Task file path |
+| `-model-annotation-dir` | No | Model annotation directory |
+
+#### What's Disabled in View Mode
+
+- Saving / deleting annotations
+- Editing annotation content (title, steps, timestamps, descriptions)
+- Adding / removing / reordering steps
+- Inserting timestamps (button and `I` key)
+- Auto-save system
+- Config editing and saving
+- File/folder browser dialogs
+
+#### What Still Works
+
+- Video playback (play, pause, seek, speed, fullscreen)
+- Video list browsing and filtering
+- Viewing annotations
+- Model annotation comparison panel
+- Click timestamp to seek video
+- Copy timestamp to clipboard
+- Keyboard shortcuts for playback (Space, ←, →)
+- Config modal (view current paths, read-only)
+
+#### Use Cases
+
+- **Annotation review**: QA team reviews without modification risk
+- **Demonstration**: Share annotated results with stakeholders
+- **Portable deployment**: Specify exact paths without touching config file
+- **Multi-instance**: Run separate view instances with different configs on different ports
 
 ---
 
@@ -718,6 +816,15 @@ For developers integrating with mp4Label:
 
 - `GET /api/config` - Get current configuration
 - `POST /api/config` - Save configuration
+
+### Server Mode
+
+- `GET /api/mode` - Get server mode (`{"readonly": true/false}`)
+
+### Task Groups
+
+- `GET /api/task-groups` - List available task group files from TaskDir
+- `GET /api/videos?task=filename.txt` - Filter videos by specific task group file
 
 ### Request/Response Formats
 

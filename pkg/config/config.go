@@ -8,13 +8,14 @@ import (
 	"strings"
 )
 
-// Config 表示应用配置
+// Config represents application configuration
 type Config struct {
-	VideoDir           string `json:"video_dir"`            // 视频目录
-	PreAnnotationDir   string `json:"pre_annotation_dir"`   // 预标注目录（可选）
-	OutputDir          string `json:"output_dir"`           // 输出目录
-	TaskFile           string `json:"task_file"`            // 子任务文件（可选），用于指定要标注的视频列表
-	ModelAnnotationDir string `json:"model_annotation_dir"` // 模型标注目录（可选），用于算法人员对比模型标注效果
+	VideoDir           string `json:"video_dir"`            // Video directory
+	PreAnnotationDir   string `json:"pre_annotation_dir"`   // Pre-annotation directory (optional)
+	OutputDir          string `json:"output_dir"`           // Output directory
+	TaskFile           string `json:"task_file"`            // Single task file (optional), specifies video list to annotate
+	TaskDir            string `json:"task_dir"`             // Task directory (optional), contains multiple task .txt files as task groups
+	ModelAnnotationDir string `json:"model_annotation_dir"` // Model annotation directory (optional), for algorithm engineers
 }
 
 var defaultConfig = Config{
@@ -88,7 +89,7 @@ func Save(config *Config) error {
 // CleanPath 清理路径中的引号
 func CleanPath(path string) string {
 	path = strings.TrimSpace(path)
-	
+
 	// 移除前后的单引号或双引号
 	if len(path) >= 2 {
 		if (path[0] == '\'' && path[len(path)-1] == '\'') ||
@@ -96,16 +97,17 @@ func CleanPath(path string) string {
 			path = path[1 : len(path)-1]
 		}
 	}
-	
+
 	return path
 }
 
-// Normalize 规范化配置路径
+// Normalize normalizes config paths
 func (c *Config) Normalize() {
 	c.VideoDir = CleanPath(c.VideoDir)
 	c.PreAnnotationDir = CleanPath(c.PreAnnotationDir)
 	c.OutputDir = CleanPath(c.OutputDir)
 	c.TaskFile = CleanPath(c.TaskFile)
+	c.TaskDir = CleanPath(c.TaskDir)
 	c.ModelAnnotationDir = CleanPath(c.ModelAnnotationDir)
 }
 
@@ -113,7 +115,7 @@ func (c *Config) Normalize() {
 func (c *Config) Validate() error {
 	// 先规范化路径
 	c.Normalize()
-	
+
 	if c.VideoDir == "" {
 		return fmt.Errorf("video directory cannot be empty")
 	}
@@ -138,6 +140,16 @@ func (c *Config) Validate() error {
 	if c.TaskFile != "" {
 		if _, err := os.Stat(c.TaskFile); os.IsNotExist(err) {
 			return fmt.Errorf("task file does not exist: %s", c.TaskFile)
+		}
+	}
+
+	if c.TaskDir != "" {
+		info, err := os.Stat(c.TaskDir)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("task directory does not exist: %s", c.TaskDir)
+		}
+		if err == nil && !info.IsDir() {
+			return fmt.Errorf("task directory path is not a directory: %s", c.TaskDir)
 		}
 	}
 

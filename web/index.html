@@ -54,6 +54,14 @@
                         <small style="color: #666; display: block; margin-top: 4px;">Only annotate videos listed in this file (one name per line, without .mp4 extension)</small>
                     </div>
                     <div class="form-group">
+                        <label for="taskDir">Task Directory (optional):</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="taskDir" placeholder="/path/to/task-files" style="flex: 1;">
+                            <button type="button" class="btn btn-secondary" onclick="openBrowser('taskDir', 'directory')" title="Browse folder">📁</button>
+                        </div>
+                        <small style="color: #666; display: block; margin-top: 4px;">Directory with multiple task .txt files; each file is a selectable task group. Takes priority over Task File.</small>
+                    </div>
+                    <div class="form-group">
                         <label for="modelAnnotationDir">Model Annotation Directory (optional):</label>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="text" id="modelAnnotationDir" placeholder="/path/to/model-annotations" style="flex: 1;">
@@ -74,6 +82,12 @@
             <!-- Left Sidebar: Video List -->
             <div class="sidebar" id="sidebar">
                 <div class="resize-handle" data-panel="sidebar"></div>
+                <div class="task-group-selector" id="taskGroupSelector" style="display: none;">
+                    <label for="taskGroupSelect">Task Group:</label>
+                    <select id="taskGroupSelect">
+                        <option value="">All Videos</option>
+                    </select>
+                </div>
                 <div class="search-box">
                     <input type="text" id="searchInput" placeholder="Search videos...">
                 </div>

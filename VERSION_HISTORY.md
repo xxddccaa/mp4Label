@@ -2,6 +2,134 @@
 
 Complete version history and release notes for mp4Label.
 
+## [v0.2.9] - 2026-02-11
+
+### Overview
+Version 0.2.9 adds **Task Directory** support — a directory containing multiple `.txt` task files, each representing a task group. Users can switch between task groups via a dropdown in the sidebar, making it easy for teams to review their own assigned video sets.
+
+### New Features
+
+#### 📂 Task Directory (Task Groups)
+- **New config field**: `task_dir` — a directory containing multiple `.txt` task files
+- **Sidebar dropdown**: When configured, a task group selector appears above the search box
+- **Dynamic switching**: Select a task group to filter the video list instantly (no reload)
+- **"All Videos" option**: First option in dropdown shows ALL videos unfiltered (ignores both task_dir and task_file)
+- **Live video count**: Label shows current video count (e.g., "Task Group (42 videos):")
+- **Visual prominence**: Dropdown styled with distinct blue border and background for easy identification
+- **Both modes**: Works in both `web` (edit) and `view` (read-only) modes
+- **Config modal**: New "Task Directory" input with browse button in configuration dialog
+- **Persisted**: Saved to `~/.mp4label/config.json` as `task_dir` field
+
+#### 🔌 New API Endpoint
+- `GET /api/task-groups` — returns `{"available": true, "groups": ["task_001.txt", "task_002.txt", ...]}`
+- `GET /api/videos?task=filename.txt` — filters videos by a specific task file from TaskDir
+
+#### ⚙️ CLI Changes
+- `mp4label web -task-dir /path/to/tasks` — specify task directory in edit mode
+- `mp4label view ... -task-dir /path/to/tasks` — specify task directory in view mode
+- **Conflict handling**: When both `-task-dir` and `-task-file` are specified, `-task-dir` takes priority with a clear `WARNING` message
+
+### Priority Rules
+- `-task-dir` > `-task-file` (when both specified)
+- CLI flags > config file values
+- "All Videos" selection ignores all task filtering
+
+### Security
+- Path traversal protection: `?task=` parameter rejects `..`, `/`, `\`
+- File must end with `.txt`
+- Absolute path verification ensures file is within TaskDir
+
+### Use Cases
+- **Team annotation**: Each annotator has their own task .txt file, selects their group
+- **Batch review**: QA reviewer switches between groups to check different annotator's work
+- **Large projects**: Split 1000s of videos into manageable groups of ~20-50
+
+### Example
+```bash
+# Directory structure
+/tasks/
+  ├── annotator_alice.txt    # 50 video names
+  ├── annotator_bob.txt      # 50 video names
+  └── annotator_carol.txt    # 53 video names
+
+# Start in view mode
+mp4label view -video-dir /videos -output-dir /output -task-dir /tasks
+
+# Or in edit mode
+mp4label web -task-dir /tasks
+```
+
+---
+
+## [v0.2.8] - 2026-02-11
+
+### Overview
+Version 0.2.8 adds a **read-only view mode** via the new `view` subcommand. This allows reviewing completed annotations without risk of accidental modification, with all config parameters specified via CLI flags.
+
+### New Features
+
+#### 👁️ Read-Only View Mode (`view` subcommand)
+- **New subcommand**: `mp4label view` starts the server in read-only mode
+- **CLI config**: All config parameters specified via command-line flags (no config file read/write)
+  - `-video-dir` (required)
+  - `-output-dir` (required)
+  - `-pre-annotation-dir` (optional)
+  - `-task-file` (optional)
+  - `-model-annotation-dir` (optional)
+  - `-port` (default: 8080)
+- **Full lockdown**: All write operations return HTTP 403 Forbidden:
+  - Save annotation (POST `/api/annotation/`)
+  - Delete annotation (DELETE `/api/annotation/`)
+  - Save config (POST `/api/config`)
+  - Open file dialog (GET `/api/dialog`)
+- **Frontend enforcement**: UI disabled in addition to backend protection
+  - Save, Delete, Add Step, Insert Timestamp buttons disabled
+  - All inputs/textareas set to read-only
+  - Drag-and-drop step reordering disabled
+  - Step remove buttons hidden
+  - Auto-save system completely disabled
+  - `I` key shortcut disabled
+  - Config modal: inputs read-only, browse buttons hidden, save button hidden
+- **Visual indicators**:
+  - Red "View Only" badge in header
+  - "🔒 View Only" status in editor
+  - Disabled buttons have reduced opacity
+
+#### 🔌 New API Endpoint
+- `GET /api/mode` — returns `{"readonly": true/false}` for frontend to detect server mode
+
+### What Works in View Mode
+- Video playback (play, pause, seek, speed control, fullscreen)
+- Video list browsing and filtering
+- Viewing annotations (all content displayed)
+- Model annotation comparison panel
+- Click timestamp to seek video
+- Copy timestamp to clipboard
+- Keyboard shortcuts for playback (Space, ←, →)
+- Config modal viewing (read-only)
+
+### Use Cases
+- **Annotation review**: Review completed annotations without accidental edits
+- **Demonstration**: Share annotated results with stakeholders
+- **Quality assurance**: QA team can review without modification access
+- **Portable deployment**: Specify exact paths via CLI without touching config file
+
+### Examples
+```bash
+# Basic view mode
+mp4label view -video-dir /path/to/videos -output-dir /path/to/annotations
+
+# Custom port with all options
+mp4label view -port 9090 \
+  -video-dir /data/videos \
+  -output-dir /data/annotations \
+  -pre-annotation-dir /data/pre-annotations \
+  -task-file /data/task.txt \
+  -model-annotation-dir /data/model-annotations
+```
+
+---
+
 ## [v0.2.7] - 2026-02-06
 
 ### Overview

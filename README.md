@@ -11,6 +11,7 @@ mp4Label is a cross-platform video annotation tool built with Go, designed for a
 - ✏️ **Annotation Editor**: Edit tutorial titles, timestamps, and step descriptions
 - 🎬 **Professional Player**: Video.js-based with zoom, fullscreen, speed control
 - 💾 **Auto-Save**: Real-time auto-save with visual status indicator
+- 👁️ **View Mode**: Read-only `view` subcommand for safe annotation review (CLI config, no editing)
 - ⚡ **Quick Annotation**: One-click timestamp insertion with millisecond precision
 - 🎯 **Smart Insertion**: Press I to insert below selected step
 - 🎯 **Click to Seek**: Click timestamp to jump to video position
@@ -19,6 +20,7 @@ mp4Label is a cross-platform video annotation tool built with Go, designed for a
 - ⌨️ **Keyboard Shortcuts**: Space to play/pause, arrows to seek (0.5s), I to insert
 - 🎛️ **Status Filtering**: Filter videos by annotation status
 - 📊 **Task File Support**: Specify a subset of videos to annotate via text file
+- 📂 **Task Directory**: Multiple task groups in a directory, switchable via sidebar dropdown
 - 📈 **Statistics Display**: Real-time display of total/annotated/pre-annotated/unannotated counts
 - ⚙️ **Smart Config**: Handles quoted paths, prevents accidental dialog close
 - 💾 **Persistent Config**: Saves to `~/.mp4label/config.json`
@@ -65,6 +67,18 @@ bin/mp4label.exe web
    - **Task File**: Text file with video names to annotate (optional, one name per line without .mp4 extension)
    - **Model Annotation Directory**: Folder with model-generated annotations (optional, for algorithm engineers)
 4. Click "Save"
+
+### View Mode (Read-Only)
+
+```bash
+# Review annotations without editing risk
+mp4label view -video-dir /path/to/videos -output-dir /path/to/annotations
+
+# With custom port and all options
+mp4label view -port 9090 -video-dir /videos -output-dir /output -task-file /task.txt
+```
+
+In view mode: all editing is disabled, config is specified via CLI flags, no config file is read or modified.
 
 ## 📚 Documentation
 
@@ -179,6 +193,9 @@ mp4Label/
 - `DELETE /api/annotation/:filename` - Delete annotation
 - `GET /api/config` - Get configuration
 - `POST /api/config` - Save configuration
+- `GET /api/mode` - Get server mode (readonly/edit)
+- `GET /api/task-groups` - List available task groups
+- `GET /api/dialog` - Open native file/folder dialog
 
 ## 💻 Tech Stack
 
@@ -222,14 +239,14 @@ Contributions welcome! Please:
 
 ## 📌 Version
 
-Current version: **v0.2.7** (2026-02-06)
+Current version: **v0.2.9** (2026-02-11)
 
 Recent updates:
+- **v0.2.9** - Task directory with switchable task groups for team annotation
+- **v0.2.8** - Read-only view mode with CLI config for safe annotation review
 - **v0.2.7** - Auto-save annotations, fix 1ms timestamp precision issue
 - **v0.2.6** - Native OS file/folder dialogs for configuration
 - **v0.2.5** - Model annotation comparison panel for algorithm engineers
-- **v0.2.4** - Task file support, statistics display
-- **v0.2.3** - Keyboard shortcuts (0.5s), click-to-copy timestamp, bug fixes, documentation consolidation
 
 See [VERSION_HISTORY.md](VERSION_HISTORY.md) for complete history.
 
